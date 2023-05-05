@@ -40,7 +40,28 @@ az aks get-credentials --resource-group <resource-group> --name <cluster-name>
 
 ### Basics of `kubectl`
 
+<div class="tip" data-title="Tip">
+
+> Highly recommend you implemnet terminal settings as found in the [`kubectl` Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/)
+
+</div>
+
+```bash
+kubectl cluster-info
+kubectl config get-contexts
+kubectl config use-context <context>
+```
+
 ## Deploying your first app
+
+Let's deploy our first app to Kubernetes using the imperative approach.
+
+```bash
+kubectl run nginx --image nginx
+kubectl port-forward po/nginx 8080:80
+```
+
+```
 
 ---
 
@@ -97,3 +118,4 @@ The app is running, but it's not very useful if it can't handle a lot of traffic
 ## Automating deployments
 
 We've been deploying our app manually. Let's see how we can automate that.
+```
