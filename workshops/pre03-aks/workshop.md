@@ -56,7 +56,7 @@ When you see these blocks of text, you should follow the instructions below.
 
 <div class="info" data-title="Info">
 
-> This means you should pay attention to some information.
+> This means there's some additional context.
 
 </div>
 
@@ -369,15 +369,17 @@ az acr build \
 
 </div>
 
-## Yo, YAML!
+## Creating your first YAML Deployment
 
 Earlier, we learned that Kubernetes uses YAML manifests to describe the state of your cluster.
 
-In the previous secion, we used `kubectl` to run a pod using both the imperative and declarative approaches. But, did you know that `kubectl` can also be used to generate YAML manifests for you? Let's take a look at how we can do that to generate a YAML file for our app.
+In the previous secion, we used `kubectl` to run a pod using both the imperative and declarative approaches. 
+
+But, did you know that `kubectl` can also be used to generate YAML manifests for you? Let's take a look at how we can do that to generate a YAML file for our app.
 
 <div class="task" data-title="Task">
 
-> Open a new terminal and make sure you are at the root of the repo then run the following command to generate a YAML file for our app.
+> Open a new terminal and make sure you are at the root of the repo then run the following command to generate a YAML file for our app. Don't forget to replace `<resource-group>` with your resource group name.
 
 </div>
 
@@ -404,7 +406,7 @@ The `--dry-run=client` flag combined with the `--output yaml` flag tells `kubect
 
 Did you notice that we are creating a **Deployment** resource instead of a **Pod** resource? This is because we want to scale our app up and down. If we were to use a Pod resource, we can only run a single instance of it.
 
-## Configuring apps
+## Configuring apps using environment variables
 
 The base YAML file that was generated for us is a good starting point, but we need to make a few changes to it before we can deploy it to AKS. The first thing we need to do is add the environment variables to configure the app.
 
@@ -508,7 +510,9 @@ status: {}
 
 </details>
 
-We also need database credentials to be able to connect to the database. We could add them to the YAML file, but that would mean that they would be stored in plain text. This is not a good idea because anyone who has access to the YAML file would be able to see the credentials. Instead, we are going to use a Kubernetes secret to store the credentials.
+## Securing credentials using "Secrets"
+
+We also need database credentials to be able to connect to the database. We could add them to the YAML file, but that would mean that they would be stored in plain text. This is not a good idea because anyone who has access to the YAML file would be able to see the credentials. Instead, we are going to use a [Kubernetes secret](https://kubernetes.io/docs/concepts/configuration/secret/) to store the credentials.
 
 <div class="task" data-title="Task">
 
@@ -696,7 +700,9 @@ status: {}
 kubectl apply -f azure-voting-db-deployment.yaml
 ```
 
-With the database deployed in a pod, the front end application will need to be able to connect to it. We could use the Pod IP to connect to that will not be resilient since Pods are ephemeral and are given random IP addresses as they are created. So we'll need to create a service for the PostgreSQL database. Think of a service like an internal load balancer. This will give the front end app a single point of entry to connect to the database.
+## Exposing Deployments with Services
+
+With the database deployed in a pod, the front end application will need to be able to connect to it. We could use the Pod IP to connect to that will not be resilient since Pods are ephemeral and are given random IP addresses as they are created. So we'll need to create a [Service](https://kubernetes.io/docs/concepts/services-networking/service/) for the PostgreSQL database. Think of a service like an internal load balancer. This will give the front end app a single point of entry to connect to the database.
 
 We can create a service imperatively using the `kubectl expose` command and specifying the deployment name. However, we should use the same technique of creating a YAML file and then modifying it to suit our needs.
 
@@ -865,14 +871,14 @@ With the name of your Azure Key Vault, you can now store your secrets in the Azu
 
 <div class="task" data-title="Task">
 
-> Run the following command to store the `username` and `password` secret in the Azure Key Vault.
+> Run the following command to store the database username and password in the Azure Key Vault.
 
 </div>
 
 ```bash
 az keyvault secret set \
   --vault-name $AKV_NAME \
-  --name database-username \
+  --name database-user \
   --value postgres
 
 az keyvault secret set \
@@ -883,7 +889,7 @@ az keyvault secret set \
 
 ### Using the Azure Key Vault secrets in Kubernetes
 
-You AKS cluster has also been provisioned with the Secret Store CSI driver addon. This allows you to mount secrets from the Azure Key Vault as volumes in your pods.
+You AKS cluster has also been provisioned with the [Secret Store CSI driver](https://secrets-store-csi-driver.sigs.k8s.io/) addon. This allows you to mount secrets from the Azure Key Vault as [volumes](https://kubernetes.io/docs/concepts/storage/volumes/) in your pods.
 
 <div class="info" data-title="Info">
 
@@ -914,9 +920,9 @@ aks-secrets-store-provider-azure-tcc7f   1/1     Running   0          3m35s
 
 </details>
 
-In order to use the Secret Store CSI driver, we need to create a SecretProviderClass. This is a Kubernetes object that tells the Secret Store CSI driver which secrets to mount and where to mount them. The authentication to the Azure Key Vault will be done using workload identity. This means that the pod will use the managed identity of the AKS cluster to authenticate to the Azure Key Vault.
+In order to use the Secret Store CSI driver, we need to create a SecretProviderClass. This is a Kubernetes object that tells the Secret Store CSI driver which secrets to mount and where to mount them. The authentication to the Azure Key Vault will be done using [workload identity](https://learn.microsoft.com/azure/aks/csi-secrets-store-identity-access#access-with-an-azure-ad-workload-identity-preview). This means that the pod will use the managed identity of the AKS cluster to authenticate to the Azure Key Vault.
 
-To do this, we need to create a **ServiceAccount** which uses the managed identity of the AKS cluster and used within the pod.
+To do this, we need to create a [ServiceAccount](https://kubernetes.io/docs/concepts/security/service-accounts/) which will use the managed identity of the AKS cluster and attached to the pod. This way, if your app running in the pod, needs to access resources in Azure, it can do so using the managed identity.
 
 <div class="task" data-title="Task">
 
@@ -951,11 +957,11 @@ metadata:
 EOF
 ```
 
-Next, we need to create a SecretProviderClass.
+Next, we need to create a SecretProviderClass which will tell the Secret Store CSI driver which secrets to mount and where to retrieve them from.
 
 <div class="task" data-title="Task">
 
-> Run the following commands to retrieve information needed to create a SecretProviderClass using a [workload identity](https://learn.microsoft.com/azure/aks/csi-secrets-store-identity-access#access-with-an-azure-ad-workload-identity-preview) to access the key vault.
+> Run the following commands to retrieve information needed to create a SecretProviderClass using a workload identity to access the key vault.
 
 </div>
 
@@ -1006,9 +1012,52 @@ Finally, we need to update our database and app deployments to use the ServiceAc
 
 <div class="task" data-title="Task">
 
-> Open the `azure-voting-db-deployment.yaml` file and update the YAML to look like the following:
+> Open the `azure-voting-db-deployment.yaml` file and replace your entire `env:` block with this.
 
 </div>
+
+```yaml
+env:
+  - name: POSTGRES_USER_FILE
+    value: "/mnt/secrets-store/database-user"
+  - name: POSTGRES_PASSWORD_FILE
+    value: "/mnt/secrets-store/database-password"
+```
+
+<div class="task" data-title="Task">
+
+> Directly underneath the `env:` block add this to mount the secrets into the container.
+
+</div>
+
+```yaml
+volumeMounts:
+  - name: azure-voting-db-secrets
+    mountPath: "/mnt/secrets-store"
+    readOnly: true
+```
+
+<div class="task" data-title="Task">
+
+> Next add a new line after the `volumeMounts:` block and make sure it is indented to the same level as the `containers:` block. Add this to enable the pod to use the service account and add a volume to mount the secrets into.
+
+</div>
+
+```yaml
+serviceAccountName: azure-voting-app-serviceaccount
+  volumes:
+    - name: azure-voting-db-secrets
+      csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: azure-keyvault-secrets
+```
+
+Your final `azure-voting-db-deployment.yaml` file should look like this.
+
+<details>
+<summary>Click to expand code</summary>
 
 ```yaml
 apiVersion: apps/v1
@@ -1054,11 +1103,59 @@ spec:
 status: {}
 ```
 
+</details>
+
 <div class="task" data-title="Task">
 
-> Open the `azure-voting-app-deployment.yaml` file and update the YAML to look like the following:
+> Open the `azure-voting-app-deployment.yaml` file and do the same thing for the app deployment. Replace your entire `env:` block with this.
 
 </div>
+
+```yaml
+env:
+  - name: FIRST_VALUE
+    value: "Dogs"
+  - name: SECOND_VALUE
+    value: "Cats"
+  - name: DATABASE_SERVER
+    value: "azure-voting-db"
+```
+
+<div class="task" data-title="Task">
+
+> Add this to mount the secrets into the container.
+
+</div>
+
+```yaml
+volumeMounts:
+  - name: azure-voting-db-secrets
+    mountPath: "/mnt/secrets-store"
+    readOnly: true
+```
+
+
+<div class="task" data-title="Task">
+
+> Finally add this to enable the pod to use the service account and add a volume to mount the secrets into.
+
+</div>
+
+```yaml
+serviceAccountName: azure-voting-app-serviceaccount
+volumes:
+  - name: azure-voting-db-secrets
+    csi:
+      driver: secrets-store.csi.k8s.io
+      readOnly: true
+      volumeAttributes:
+        secretProviderClass: azure-keyvault-secrets
+```
+
+<details>
+<summary>Click to expand code</summary>
+
+The updated YAML to look like the following:
 
 ```yaml
 apiVersion: apps/v1
@@ -1108,6 +1205,8 @@ spec:
 status: {}
 ```
 
+</details>
+
 <div class="task" data-title="Task">
 
 > Deploy the updated YAML files to your cluster.
@@ -1126,7 +1225,7 @@ kubectl apply -f azure-voting-app-deployment.yaml
 </div>
 
 ```bash
-kubectl get deployments,pods,secrets
+kubectl get deployments,pods,services,secrets
 ```
 
 <details>
@@ -1134,18 +1233,26 @@ kubectl get deployments,pods,secrets
 
 ```text
 NAME                               READY   UP-TO-DATE   AVAILABLE   AGE
-deployment.apps/azure-voting-app   1/1     1            1           149m
-deployment.apps/azure-voting-db    1/1     1            1           150m
+deployment.apps/azure-voting-app   1/1     1            1           23m
+deployment.apps/azure-voting-db    1/1     1            1           23m
 
-NAME                                    READY   STATUS        RESTARTS   AGE
-pod/azure-voting-app-6bc9446ddb-xvdgc   1/1     Terminating   0          132m
-pod/azure-voting-app-7584b76bd5-xx285   1/1     Running       0          3s
-pod/azure-voting-db-6dd7cb94c6-nh8zg    1/1     Running       0          114s
+NAME                                    READY   STATUS    RESTARTS   AGE
+pod/azure-voting-app-756dc858f8-b4rkx   2/2     Running   0          22m
+pod/azure-voting-db-59f4d48797-djt4z    2/2     Running   0          23m
+
+NAME                       TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
+service/azure-voting-app   ClusterIP   10.0.110.128   <none>        8080/TCP   10h
+service/azure-voting-db    ClusterIP   10.0.58.27     <none>        5432/TCP   10h
+service/kubernetes         ClusterIP   10.0.0.1       <none>        443/TCP    12h
 ```
 
 </details>
 
-Did you notice the new secret? It was created by the CSI driver and contains the password for the database.
+<div class="info" data-title="Info">
+
+> Did you notice we don't have any secrets in the cluster anymore? This is because the secrets were pulled from Azure KeyVault using the Secrets Store CSI driver and mounted into the pods. The secrets end up as files in the pod's file system in the `/mnt/secrets-store` directory. The app and database containers can read the secrets from the files. The container that we built to host the app does not have shell access so no one can read the secrets from the files other than the app and database containers.
+
+</div>
 
 <div class="task" data-title="Task">
 
@@ -1177,11 +1284,11 @@ Let's see when we restart the database and app pods.
 kubectl delete pod --all
 ```
 
-Wait for the pods to restart and then run the `kubectl port-forward` command again, and refresh the browser. You should see that the votes have been reset to 0.
+Wait for the pods to restart and then run the `kubectl port-forward` command again, and refresh the browser. You should see that the votes have been reset to 0 😭
 
 ### Using Azure Disk for PGDATA
 
-This can be solved by leveraging persistent storage; more specifically, by taking advantage of the Azure CSI drivers and storage classes that have been pre-deployed into your cluster.
+This can be solved by leveraging persistent storage; more specifically, by taking advantage of the [Azure CSI drivers and storage classes](https://learn.microsoft.com/azure/aks/csi-storage-drivers) that have been pre-deployed into your cluster.
 
 <div class="task" data-title="Task">
 
@@ -1193,11 +1300,8 @@ This can be solved by leveraging persistent storage; more specifically, by takin
 kubectl get storageclasses
 ```
 
-<div class="info" data-title="Info">
-
-> You should see the following storage classes:
-
-</div>
+<details>
+<summary>Click to expand output</summary>
 
 ```text
 NAME                    PROVISIONER          RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
@@ -1212,7 +1316,9 @@ managed-csi-premium     disk.csi.azure.com   Delete          WaitForFirstConsume
 managed-premium         disk.csi.azure.com   Delete          WaitForFirstConsumer   true                   5h22m
 ```
 
-Typically for persistent storage, you would create a Persistent Volume (PV) and Persistent Volume Claim (PVC) to request storage. However, the Azure CSI drivers allow you to create a PVC and have the driver create the Azure Storage-backed PV for you.
+</details>
+
+Typically for persistent storage, you would create a [Persistent Volume (PV)](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) and [Persistent Volume Claim (PVC)](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims) to request storage. However, the Azure CSI drivers allow you to create a PVC and have the driver create the Azure Storage-backed PV for you.
 
 <div class="task" data-title="Task">
 
@@ -1271,9 +1377,12 @@ With the PVC created, we can now update the Deployment manifest to use it.
 
 <div class="info" data-title="Info">
 
-> Your `azure-voting-db-deployment.yaml` file should now look like this:
+> Your `azure-voting-db-deployment.yaml` file should look like this:
 
 </div>
+
+<details>
+<summary>Click to expand code</summary>
 
 ```yaml
 apiVersion: v1
@@ -1312,11 +1421,10 @@ spec:
           name: postgres
           resources: {}
           env:
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: azure-voting-db-secrets
-                  key: password
+            - name: POSTGRES_USER_FILE
+              value: "/mnt/secrets-store/database-user"
+            - name: POSTGRES_PASSWORD_FILE
+              value: "/mnt/secrets-store/database-password"
           volumeMounts:
             - name: azure-voting-db-secrets
               mountPath: "/mnt/secrets-store"
@@ -1338,6 +1446,8 @@ spec:
 status: {}
 ```
 
+</details>
+
 <div class="task" data-title="Task">
 
 > Run the following command to deploy the updated manifest.
@@ -1358,16 +1468,17 @@ kubectl apply -f azure-voting-db-deployment.yaml
 kubectl get pvc
 ```
 
-<div class="info" data-title="Info">
+<details>
+<summary>Click to expand output</summary>
 
-> You should see the following output with a `STATUS` of `Bound`. This means the PVC has been successfully created and is ready to be used by the pod.
-
-</div>
+You should see the following output with a `STATUS` of `Bound`. This means the PVC has been successfully created and is ready to be used by the pod.
 
 ```bash
 NAME            STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS          AGE
 pvc-azuredisk   Bound    pvc-e25b6853-21c9-493c-8d19-f4bae2e29be8   10Gi       RWO            managed-csi-premium   2m9s
 ```
+
+</details>
 
 <div class="task" data-title="Task">
 
@@ -1379,13 +1490,13 @@ pvc-azuredisk   Bound    pvc-e25b6853-21c9-493c-8d19-f4bae2e29be8   10Gi       R
 
 ## Sharing your app with the world
 
-Up until now, we've been accessing our app using port forwarding. This is great for testing, but not very useful for a real app.
+Up until now, we've been accessing our app using port forwarding. This is great for testing, but not very useful if you want users to use your app.
 
-We'll do this by leaveraging the newly announced Istio add-on for AKS. Istio is a service mesh that provides a lot of useful features, including observability, traffic management, and more. It also provides the Ingress Gateway which we'll use to expose our app to the world.
+To expose your app to users, we can leaverage the newly announced [Istio service mesh add-on for AKS](https://learn.microsoft.com/azure/aks/istio-deploy-addon). Istio is a service mesh that provides a lot of useful features, including [security, observability, traffic management, and more](https://istio.io/latest/docs/concepts/). We won't be using all the features of Istio, We will however, leverage the [Ingress Gateway](https://istio.io/latest/docs/tasks/traffic-management/ingress/ingress-control/) to expose our app outside of the cluster.
 
 ### Setting up Istio
 
-We won't be using all the features of Istio, but we will use the Ingress Gateway to expose our app. The Istio add-on has already been installed in your AKS cluster with an external ingress gateway enabled.
+The Istio add-on has already been installed in your AKS cluster with an external ingress gateway enabled.
 
 <div class="info" data-title="Info">
 
@@ -1400,6 +1511,8 @@ kubectl get service -n aks-istio-ingress
 <details>
 <summary>Click to expand output</summary>
 
+Note the `NAME` and `EXTERNAL-IP` of the service. The `NAME` will be used when we create our Istio resources to expose our app and the `EXTERNAL-IP` address will be used to access our app.
+
 ```text
 NAME                                TYPE           CLUSTER-IP     EXTERNAL-IP     PORT(S)                                      AGE
 aks-istio-ingressgateway-external   LoadBalancer   10.0.182.197   20.252.61.166   15021:30831/TCP,80:30738/TCP,443:31546/TCP   40m
@@ -1407,11 +1520,11 @@ aks-istio-ingressgateway-external   LoadBalancer   10.0.182.197   20.252.61.166 
 
 </details>
 
-Istio works by injecting a sidecar container into each pod. This sidecar container is responsible for handling all the traffic to and from the pod. We'll need to update our deployment manifest to include the Istio sidecar.
+Istio works by injecting a sidecar container into each pod. This sidecar container is responsible for handling all the traffic to and from containers in the pod. This sidecar can be manually injected in your deployments or you can tell Istio to automatically inject Istio sidecars.
 
 <div class="task" data-title="Task">
 
-> Label the default namespace so that Istio will automatically inject the sidecar into our pods.
+> Label the `default` namespace so that Istio will automatically inject the sidecar into our pods.
 
 </div>
 
@@ -1419,7 +1532,7 @@ Istio works by injecting a sidecar container into each pod. This sidecar contain
 kubectl label namespace default istio.io/rev=asm-1-17
 ```
 
-Currently, our deployments do not have a sidecar container. Let's reploy our manifests to trigger Istio to inject sidecar containers into our pods.
+Our deployments do not have a sidecar container. Let's reploy our manifests to trigger Istio to inject sidecar containers into our pods.
 
 <div class="task" data-title="Task">
 
@@ -1452,11 +1565,11 @@ azure-voting-app-7584b76bd5-mwg4q   2/2     Running   0          69s
 azure-voting-db-8467b69b99-dg95g    2/2     Running   0          79s
 ```
 
+</details>
+
 ### Exposing the app using the Ingress Gateway
 
-Now that we have Istio installed and our app is running with the Istio sidecar, we can expose our app to the world using the Ingress Gateway.
-
-Let's create a Gateway and Virtual Service to expose our app.
+Now that we have Istio installed and our app is running with the Istio sidecar, we can expose our app to the world using the Ingress Gateway. To do this, we need to implement two custom resources that got installed in the AKS cluster when Istio was installed. We will use the [Gateway](https://istio.io/latest/docs/reference/config/networking/gateway/) and [Virtual Service](https://istio.io/latest/docs/reference/config/networking/virtual-service/) resources to route traffic to our app.
 
 <div class="task" data-title="Task">
 
@@ -1498,6 +1611,99 @@ spec:
               number: 8080
 ```
 
+Here, we are creating a `Gateway` resource that will route traffic to our app using the `aks-istio-ingressgateway-external` service. The gateway will listen on port 80 and route traffic to any host. Next, we create a `VirtualService` resource that will route traffic to our backend `Service` resource using the Gateway resource we just created.
+
+<div class="info" data-title="Info">
+
+> Your `azure-voting-db-deployment.yaml` file should look like this:
+
+</div>
+
+<details>
+<summary>Click to expand code</summary>
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: azure-voting-app
+  name: azure-voting-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: azure-voting-app
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: azure-voting-app
+    spec:
+      containers:
+        - image: acruser197.azurecr.io/azure-voting-app:v1
+          name: azure-voting-app
+          ports:
+            - containerPort: 8080
+          resources: {}
+          env:
+            - name: FIRST_VALUE
+              value: "Dogs"
+            - name: SECOND_VALUE
+              value: "Cats"
+            - name: DATABASE_SERVER
+              value: "azure-voting-db"
+          volumeMounts:
+            - name: azure-voting-db-secrets
+              mountPath: "/mnt/secrets-store"
+              readOnly: true
+      serviceAccountName: azure-voting-app-serviceaccount
+      volumes:
+        - name: azure-voting-db-secrets
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: azure-keyvault-secrets
+status: {}
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: azure-voting-app-gateway
+spec:
+  selector:
+    istio: aks-istio-ingressgateway-external
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "*"
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: azure-voting-app-virtualservice
+spec:
+  hosts:
+    - "*"
+  gateways:
+    - azure-voting-app-gateway
+  http:
+    - route:
+        - destination:
+            host: azure-voting-app
+            port:
+              number: 8080
+
+```
+
+</details>
+
 <div class="task" data-title="Task">
 
 > Run the following command to create an Istio Gateway and Virtual Service.
@@ -1508,11 +1714,27 @@ spec:
 kubectl apply -f azure-voting-app-service.yaml
 ```
 
+<div class="task" data-title="Task">
+
+> Run the following command to get the IP address of the Istio Ingress Gateway, then browse to that IP address to see your app running.
+
+</div>
+
+```bash
+# get the ip
+INGRESS_IP=$(kubectl get svc -n aks-istio-ingress aks-istio-ingressgateway-external -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+
+# browse to the app
+echo "http://$INGRESS_IP/"
+```
+
+Our app is now accessible to the world!
+
 ---
 
 ## Observing your app
 
-With the app running and exposed to the world, we need a way to observe what's happening within the cluster. In AKS, we can use Azure Monitor for Containers to get insights into our cluster. Additionally, we can leverage Azure-managed Prometheus and Grafana to get even more insights into our cluster.
+With the app running and exposed to the world, we need a way to observe what's happening within the cluster. In AKS, we can use [Azure Container Insights](https://learn.microsoft.com/azure/azure-monitor/containers/container-insights-overview) to get insights into our cluster. Additionally, we can leverage [Azure Monitor managed service for Prometheus](https://learn.microsoft.com/en-Us/azure/azure-monitor/essentials/prometheus-metrics-overview) and [Azure Managed Grafana](https://learn.microsoft.com/en-us/azure/managed-grafana/overview) to get insights into our cluster using tooling that is very popular in the Cloud Native ecosystem.
 
 ### Azure Monitor for Containers
 
@@ -1542,7 +1764,7 @@ The Azure Managed Grafana instance is pre-configured with a number of dashboards
 
 ---
 
-## Scaling your app
+## BONUS: Scaling your app
 
 As your app becomes more popular, you'll need to scale it to handle the increased load. In AKS, you can scale your app by increasing the number of replicas in your deployment. The Kubernetes Horizontal Pod Autoscaler (HPA) will automatically scale your app based on CPU utilization. Let's take this a step further and implement KEDA to scale our app. KEDA is a Kubernetes-based Event Driven Autoscaler. It allows you to scale your app based on events, such as messages in a queue. It works with Horizontal Pod Autoscaler to scale your app based on events.
 
@@ -1556,12 +1778,10 @@ As your app becomes more popular, you'll need to scale it to handle the increase
 
 ```yaml
 ---
-# add keda scaled object with cpu trigger at 50% utilization
-apiVersion: keda.k8s.io/v1alpha1
+apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
   name: azure-voting-app-scaledobject
-  namespace: default
 spec:
   scaleTargetRef:
     name: azure-voting-app
@@ -1570,7 +1790,6 @@ spec:
       metricType: Utilization
       metadata:
         value: "50"
-        containerName: azure-voting-app
 ```
 
 <div class="task" data-title="Task">
@@ -1593,11 +1812,56 @@ kubectl apply -f azure-voting-app-deployment.yaml
 kubectl get scaledobject
 ```
 
+<details>
+<summary>Sample output</summary>
+
+Wait until the `READY` column shows `True`
+
+```text
+NAME                            SCALETARGETKIND      SCALETARGETNAME    MIN   MAX   TRIGGERS   AUTHENTICATION   READY   ACTIVE   FALLBACK   AGE
+azure-voting-app-scaledobject   apps/v1.Deployment   azure-voting-app               cpu                         True    True     Unknown    3m40s
+```
+
+</details>
+
+### Setting request and limits
+
+When scaling on a performance metric, we need to let Kubernetes know how much compute and memory resources to allocate for each pod. We do this by setting the `requests` and `limits` in our deployment. The `requests` are the minimum amount of resources that Kubernetes will allocate for each pod. The `limits` are the maximum amount of resources that Kubernetes will allocate for each pod. Kubernetes will use these values to determine how many pods to run based on the amount of resources available on the nodes in the cluster.
+
+<div class="task" data-title="Task">
+
+> Open the `azure-voting-app-deployment.yaml` file and find the empty `resources: {}` block in your `Deployment`. Update it 
+
+</div>
+
+```yaml
+resources:
+  requests:
+    cpu: 4m
+    memory: 55Mi
+  limits:
+    cpu: 6m
+    memory: 75Mi
+```
+
+### Load testing your app
+
+Let's use the Azure Load Testing service to generate load on our app and watch KEDA scale our app.
+
+Run 100 users
+
+```bash
+kubectl get deploy -w
+```
+
+
 ---
 
 ## Automating deployments
 
 Up until now, we've been manually deploying our app. This is fine for testing, but it's not a good practice for production. In production, you'll want to automate your deployments. In AKS, you can use Azure DevOps to automate your deployments. Azure DevOps is a set of tools that allow you to automate your deployments. It includes a build pipeline, a release pipeline, and a set of tools for managing your infrastructure.
+
+---
 
 ## Resources
 
@@ -1608,6 +1872,3 @@ Up until now, we've been manually deploying our app. This is fine for testing, b
 - https://stackoverflow.com/questions/71543741/reading-in-values-from-mnt-secrets-store-after-integration-akv-with-aks-using
 - https://azure.github.io/Cloud-Native/cnny-2023/fundamentals-day-4#persistent-storage-on-aks
 
-```
-
-```
