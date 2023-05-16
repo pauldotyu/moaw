@@ -1732,7 +1732,7 @@ Our app is now accessible to the world!
 
 ---
 
-## Observing your app
+## BONUS: Observing your app
 
 With the app running and exposed to the world, we need a way to observe what's happening within the cluster. In AKS, we can use [Azure Container Insights](https://learn.microsoft.com/azure/azure-monitor/containers/container-insights-overview) to get insights into our cluster. Additionally, we can leverage [Azure Monitor managed service for Prometheus](https://learn.microsoft.com/en-Us/azure/azure-monitor/essentials/prometheus-metrics-overview) and [Azure Managed Grafana](https://learn.microsoft.com/en-us/azure/managed-grafana/overview) to get insights into our cluster using tooling that is very popular in the Cloud Native ecosystem.
 
@@ -1857,7 +1857,7 @@ kubectl get deploy -w
 
 ---
 
-## Automating deployments
+## BONUS: Automating deployments
 
 Up until now, we've been manually deploying our app. This is fine for testing, but it's not a good practice for production. In production, you'll want to automate your deployments. In AKS, you can use Azure DevOps to automate your deployments. Azure DevOps is a set of tools that allow you to automate your deployments. It includes a build pipeline, a release pipeline, and a set of tools for managing your infrastructure.
 
