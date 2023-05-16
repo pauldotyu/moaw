@@ -6,7 +6,7 @@ short_title: Getting Started with AKS # Optional. Short title displayed in the h
 description: This is a workshop for AKS # Required.
 level: beginner # Required. Can be 'beginner', 'intermediate' or 'advanced'
 authors: # Required. You can add as many authors as needed
-  - Paul Yu
+  - "@pauldotyu"
 contacts: # Required. Must match the number of authors
   - "@pauldotyu"
 duration_minutes: 20 # Required. Estimated duration in minutes
@@ -28,11 +28,21 @@ tags: kubernetes, azure # Required. Tags for filtering and searching
 
 Your lab environment has been pre-configured with the following:
 
-- Azure CLI
-- Azure Subscription
-- Visual Studio Code
-- Docker Desktop
-- Git
+- [Azure Subscription](https://azure.microsoft.com/free)
+- [Azure CLI](https://learn.microsoft.com/cli/azure/what-is-azure-cli)
+- [Visual Studio Code](https://code.visualstudio.com/)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- [Git](https://git-scm.com/)
+
+Using the login credentials provided to you, login to the [Azure Portal](https://portal.azure.com).
+
+Then, using your terminal, login to the Azure CLI using the following command:
+
+```bash
+az login
+```
+
+This command should open up a browser window and prompt you to login to Azure. Once you have logged in, you can close the browser window and return to your terminal.
 
 ## Workshop instructions
 
@@ -72,19 +82,19 @@ When you see these blocks of text, you should follow the instructions below.
 
 # Kubernetes fundamentals
 
-This workshop will introduce you to the basics of Kubernetes. We'll be using Azure Kubernetes Service (AKS) to deploy and manage the Azure Voting App.
+This section of the workshop will introduce you to the basics of Kubernetes. We'll be using [Azure Kubernetes Service (AKS)](https://azure.microsoft.com/products/kubernetes-service) to deploy and manage an [Azure Voting App](https://github.com/Azure-Samples/azure-voting-app-rust).
 
 ## Working with `kubectl`
 
-Kubernetes administartors will commonly interact with the Kuberetes API server using the `kubectl` command line tool. As you progress through your cloud natvie journey, you will find that there are other tools available for deploying, managing, and monitoring Kubernetes clusters. However, basic knowledge of `kubectl` is essential.
+Kubernetes administartors will commonly interact with the Kuberetes API server using the [`kubectl` command line tool](https://kubernetes.io/docs/reference/kubectl/). As you progress through your cloud natvie journey, you will find that there are other tools available for deploying, managing, and monitoring Kubernetes clusters. However, basic knowledge of `kubectl` is essential.
 
 ### Connecting to your AKS cluster
 
-An AKS cluster has been provisioned for you. Let's use the Azure CLI to download the credentials for the cluster. You will need to replace `<resource-group>` and `<cluster-name>` with the values provided to you.
+An AKS cluster has been provisioned for you. Let's use the Azure CLI to download the credentials for the cluster.
 
 <div class="task" data-title="Task">
 
-> Run the following command to download the credentials for your AKS cluster.
+> Replace `<resource-group>` and `<cluster-name>` in the command below with the values provided to you and run it to download the credentials for your AKS cluster.
 
 </div>
 
@@ -94,9 +104,9 @@ AKS_NAME=<cluster-name>
 az aks get-credentials --resource-group $RG_NAME --name $AKS_NAME
 ```
 
-The command above will download the credentials for the cluster and store them in `~/.kube/config`. This file is used by `kubectl` to connect to the cluster.
+The command above will download the credentials for the cluster and store them in `~/.kube/config`. This file includes cluster certificate information and is used by `kubectl` to connect to the cluster. Since it does contain certificate information, it should be treated as a secret.
 
-### Basics of `kubectl`
+### `kubectl` basics
 
 <div class="task" data-title="Task">
 
@@ -110,7 +120,7 @@ kubectl cluster-info
 
 The `kubectl` tool allows to you to interact with a variety of Kubernetes clusters.
 
-<div class="info" data-title="Info">
+<div class="tip" data-title="Tip">
 
 > You can see the list of clusters you have access to by running the following command:
 
@@ -120,7 +130,7 @@ The `kubectl` tool allows to you to interact with a variety of Kubernetes cluste
 kubectl config get-contexts
 ```
 
-<div class="info" data-title="Info">
+<div class="tip" data-title="Tip">
 
 > If you have more than one context listed, you can switch between clusters by running the following command:
 
@@ -138,7 +148,7 @@ kubectl config use-context <context-name>
 
 ## Deploying your first app
 
-The `kubectl` command line tool allows you to interact with the Kubernetes API server in a few different ways. The two most common ways are the imperative and declarative approaches. When you use the imperative approach, you are telling Kubernetes what to do. When you use the declarative approach, you are telling Kubernetes what you want.
+The `kubectl` tool allows you to interact with the Kubernetes API server imperatively or declaratively. When you use the imperative approach, you are telling Kubernetes what to do. When you use the declarative approach, you are telling Kubernetes what you want.
 
 <div class="task" data-title="Task">
 
@@ -154,6 +164,12 @@ Here, we are telling Kubernetes to run a new Pod named `nginx` using the `nginx`
 
 A Pod is the smallest unit of deployment in Kubernetes. It is a group of one or more containers that share the same network and storage. In this case, we are running a single container using the `nginx` image.
 
+<div class="info" data-title="Info">
+
+> When you run multiple containers in a Pod, this is known as a [sidecar pattern](https://docs.microsoft.com/azure/architecture/patterns/sidecar).
+
+</div>
+
 <div class="task" data-title="Task">
 
 > Let's see if our Pod is running.
@@ -164,12 +180,17 @@ A Pod is the smallest unit of deployment in Kubernetes. It is a group of one or 
 kubectl get pods
 ```
 
+<details>
+<summary>Click to expand output</summary>
+
 You should see something like this:
 
 ```text
 NAME    READY   STATUS    RESTARTS   AGE
 nginx   1/1     Running   0          7s
 ```
+
+</details>
 
 <div class="task" data-title="Task">
 
@@ -183,11 +204,21 @@ kubectl describe pod nginx
 
 This command will give us a lot of information about our Pod including the events that have occurred.
 
-Now, let's take a look at how we can deploy our app using the declarative approach.
+<div class="task" data-title="Task">
+
+> To view container logs, run the following command:
+
+</div>
+
+```bash
+kubectl logs nginx
+```
+
+Now, let's take a look at how we can deploy our app using a declarative approach.
 
 <div class="task" data-title="Task">
 
-> First, let's create a YAML file that describes our Pod.
+> Let's create a YAML manifest that describes our Pod.
 
 </div>
 
@@ -205,11 +236,17 @@ spec:
 EOF
 ```
 
-YAML is a human-readable data serialization language. It is commonly used for configuration files and in applications where data is being stored or transmitted. YAML stands for "YAML Ain't Markup Language".
+[YAML](https://yaml.org/) is a human-readable data serialization language. It is commonly used for configuration files and in applications where data is being stored or transmitted. YAML is short for "YAML Ain't Markup Language".
+
+<div class="info" data-title="Info">
+
+> The deployment details are specified in a YAML file which was passed in using [here-doc](https://linuxize.com/post/bash-heredoc/) syntax. This is a common pattern for creating YAML files in Bash scripts.
+
+</div>
 
 <div class="task" data-title="Task">
 
-> Next, let's deploy our Pod using the YAML file we just created. Don't worry if you don't understand the YAML file. We'll be covering that in more detail later.
+> Next, let's deploy our Pod using the YAML manifest we just created. Don't worry if you don't understand the YAML file. We'll be covering that in more detail later.
 
 </div>
 
@@ -218,7 +255,20 @@ kubectl apply -f nginx2.yaml
 kubectl get pods
 ```
 
-Here, we are telling Kubernetes that we want a Pod named `nginx2` using the `nginx` image. The deployment details are specified in a YAML file which was passed in using here-doc syntax.
+<details>
+<summary>Click to expand output</summary>
+
+You should see something like this:
+
+```text
+NAME     READY   STATUS    RESTARTS   AGE
+nginx    1/1     Running   0          7m49s
+nginx2   1/1     Running   0          3s
+```
+
+</details>
+
+Here, we are telling Kubernetes that we want a Pod named `nginx2` using the `nginx` image.
 
 This is different from the imperative approach where we told Kubernetes to run a Pod named `nginx` using the `nginx` image. The declarative approach is preferred because it allows us to check our code into source control and track changes over time.
 
@@ -226,7 +276,7 @@ The `kubectl apply` command is idempotent. This means that if you run the comman
 
 <div class="important" data-title="Important">
 
-> Be sure to delete the pods so that we don't waste cluster resources.
+> Before we move on, be sure to delete all pods so that we don't waste cluster resources.
 
 </div>
 
@@ -238,17 +288,21 @@ kubectl delete pods --all
 
 # Deploying to AKS
 
-We'll be deploying the Azure Voting App to Azure Kubernetes Service (AKS). This is a simple app that lets you vote for things and displays the vote totals. You may recognize this app from Microsoft Docs which allows you to vote for "Dogs" or "Cats". The example we'll be using is a slightly different in that it's been modified to allow you to vote for any two things you want based on the environment variables you set.
+We'll be deploying the Azure Voting App to Azure Kubernetes Service (AKS). This is a simple web app that lets you vote for things and displays the vote totals. You may recognize this app from Microsoft Docs which allows you to vote for "Dogs" or "Cats". The example we'll be using is a slightly different in that it's been modified to allow you to vote for any two things you want based on the environment variables you set... and written in Rust 🦀
 
 The repo can be found here: [Azure-Samples/azure-voting-app-rust](https://github.com/Azure-Samples/azure-voting-app-rust).
 
 ## Getting familiar with Azure Voting App
 
-As the name suggests, the app is written in Rust and uses PostgreSQL as the backend database. We'll be using Docker to package the app up into a container image and then deploying it to AKS.
+As the name suggests, the app uses PostgreSQL as the backend database. We'll be using Docker to package the app into a container image so that it can be deployed to AKS.
 
-Start off by forking, then cloning the repo to your local machine. When the repo has been cloned, open it up in VS Code.
+<div class="task" data-title="Task">
 
-TODO: ADD SCREEN SHOTS TO FORK AND CLONE THE REPO AND OPEN USING VSCODE
+> Start off by forking, then cloning the repo to your local machine. When the repo has been cloned, open it up in VS Code.
+
+</div>
+
+![Fork and clone repo](assets/clone-repo.png)
 
 <div class="task" data-title="Task">
 
@@ -268,15 +322,15 @@ docker-compose up
 
 Once the app is running, you should be able to access it at http://localhost:8080.
 
-TODO: ADD SCREEN SHOT OF APP RUNNING LOCALLY
+![Azure Voting App](assets/azure-voting-app.png)
 
-If you look at the `docker-compose.yml` file, you'll see that the app is made up of two services: `app` and `db`. The `app` service is the web front-end and the `db` service is the database. In the `app` service, you'll see that there are two environment variables defined: `FIRST_VALUE` and `SECOND_VALUE`. These are the options that will be displayed on the voting page.
+If you look at the `docker-compose.yml` file, you'll see that the app is made up of two services: `app` and `db`. As the names suggest, the `app` service is the web front-end and the `db` service is the database. In the `app` service, you'll see that there are two environment variables defined: `FIRST_VALUE` and `SECOND_VALUE`. These are the options that will be displayed on the voting page.
 
 ## Publishing the app to Azure Container Registry
 
-Before you can deploy our app to Kubernetes, you need to package the container image and push it to a container registry. You'll be using Azure Container Registry (ACR) for this.
+Before you can deploy our app to Kubernetes, you need to package the container image and push it to a container registry. You'll be using [Azure Container Registry (ACR)](https://azure.microsoft.com/products/container-registry) for this.
 
-There are a few different ways to push an image to ACR. We'll be using the `az acr build` command which will build the image and push it to ACR in a single command.
+There are a few different ways to push an image to ACR. We'll be using the `az acr build` command which will use [ACR Tasks](https://learn.microsoft.com/azure/container-registry/container-registry-tasks-overview) to build the image and push it to ACR.
 
 <div class="task" data-title="Task">
 
@@ -297,7 +351,7 @@ ACR_NAME=$(az resource list \
 
 <div class="task" data-title="Task">
 
-> Make sure you are at the root of your repository then run the following command to build and push the image to ACR using [ACR Tasks](https://learn.microsoft.com/azure/container-registry/container-registry-tasks-overview).
+> Make sure you are at the root of your repository then run the following command to build and push the image to ACR.
 
 </div>
 
@@ -317,9 +371,9 @@ az acr build \
 
 ## Yo, YAML!
 
-Earlier, we talked about how Kubernetes uses YAML files to describe the state of your cluster.
+Earlier, we learned that Kubernetes uses YAML manifests to describe the state of your cluster.
 
-In the previous secion, we used `kubectl` to run a pod using both the imperative and declarative approaches. But, did you know that `kubectl` can also be used to generate YAML files? Let's take a look at how we can do that to generate a YAML file for our app.
+In the previous secion, we used `kubectl` to run a pod using both the imperative and declarative approaches. But, did you know that `kubectl` can also be used to generate YAML manifests for you? Let's take a look at how we can do that to generate a YAML file for our app.
 
 <div class="task" data-title="Task">
 
@@ -338,6 +392,7 @@ ACR_NAME=$(az resource list \
   --query "[0].name" \
   --output tsv)
 
+# generate the YAML file
 kubectl create deploy azure-voting-app \
   --image $ACR_NAME.azurecr.io/azure-voting-app:latest \
   --port=8080 \
@@ -347,7 +402,7 @@ kubectl create deploy azure-voting-app \
 
 The `--dry-run=client` flag combined with the `--output yaml` flag tells `kubectl` to generate the YAML file but not actually run the command. This is useful because it allows us to see what the YAML file will look like before we actually run it. By redirecting the output to a file, we can save the YAML file to disk. If you open up the YAML file, you'll see that most of the details have been filled in for you 🥳
 
-Notice that we are creating a **Deployment** resource instead of a **Pod** resource? This is because we want to be able to scale our app up and down. If we were to use a Pod resource, we would only be able to run a single instance of our app.
+Did you notice that we are creating a **Deployment** resource instead of a **Pod** resource? This is because we want to scale our app up and down. If we were to use a Pod resource, we can only run a single instance of it.
 
 ## Configuring apps
 
@@ -391,7 +446,7 @@ kubectl explain deploy.spec.template.spec.containers.env
 
 <div class="task" data-title="Task">
 
-> Now that we know where to put the environment variables, let's add them to the YAML file. Open the `azure-voting-app-deployment.yaml` file, place your cursor after the `resource: {}` line, and add the following YAML.
+> Now that we know where to put the environment variables, let's add them to the YAML file. Open the `azure-voting-app-deployment.yaml` file, place your cursor after the `resource: {}` line, and add the following block of code.
 
 </div>
 
@@ -405,9 +460,12 @@ env:
 
 <div class="important" data-title="Important">
 
-> YAML is very sensitive to indentation. Make sure you indent the environment variables correctly. The resulting YAML file should look like this:
+> YAML is very sensitive to indentation. Make sure you indent the environment variables exactly as its shown above. The resulting YAML file should look like this:
 
 </div>
+
+<details>
+<summary>Click to expand output</summary>
 
 ```yaml
 apiVersion: apps/v1
@@ -430,7 +488,7 @@ spec:
         app: azure-voting-app
     spec:
       containers:
-        - image: acruser123.azurecr.io/azure-voting-app:latest
+        - image: <REPLACE_THIS_WITH_YOUR_ACR_NAME>.azurecr.io/azure-voting-app:latest
           name: azure-voting-app
           resources: {}
           env:
@@ -438,8 +496,17 @@ spec:
               value: "Dogs"
             - name: SECOND_VALUE
               value: "Cats"
+            - name: DATABASE_SERVER
+              value: azure-voting-db
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: azure-voting-db-secrets
+                  key: password
 status: {}
 ```
+
+</details>
 
 We also need database credentials to be able to connect to the database. We could add them to the YAML file, but that would mean that they would be stored in plain text. This is not a good idea because anyone who has access to the YAML file would be able to see the credentials. Instead, we are going to use a Kubernetes secret to store the credentials.
 
@@ -451,10 +518,11 @@ We also need database credentials to be able to connect to the database. We coul
 
 ```bash
 kubectl create secret generic azure-voting-db-secrets \
+  --from-literal=username=postgres \
   --from-literal=password=mypassword
 ```
 
-Now that we have created the secret, we need to tell Kubernetes to use it. We can do this by adding a `envFrom` property to the `containers` object.
+Now that we have created the secret, we need to tell Kubernetes to use it. We can do this by adding a `valueFrom` property to the `containers` object.
 
 <div class="task" data-title="Task">
 
@@ -465,6 +533,11 @@ Now that we have created the secret, we need to tell Kubernetes to use it. We ca
 ```yaml
 - name: DATABASE_SERVER
   value: azure-voting-db
+- name: DATABASE_USER
+  valueFrom:
+    secretKeyRef:
+      name: azure-voting-db-secrets
+      key: username
 - name: DATABASE_PASSWORD
   valueFrom:
     secretKeyRef:
@@ -478,6 +551,9 @@ Now that we have created the secret, we need to tell Kubernetes to use it. We ca
 
 </div>
 
+<details>
+<summary>Click to expand output</summary>
+
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -499,7 +575,7 @@ spec:
         app: azure-voting-app
     spec:
       containers:
-        - image: acruser123.azurecr.io/azure-voting-app:latest
+        - image: <REPLACE_THIS_WITH_YOUR_ACR_NAME>.azurecr.io/azure-voting-app:latest
           name: azure-voting-app
           ports:
             - containerPort: 8080
@@ -511,6 +587,11 @@ spec:
               value: "Cats"
             - name: DATABASE_SERVER
               value: "azure-voting-db"
+            - name: DATABASE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: azure-voting-db-secrets
+                  key: username
             - name: DATABASE_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -518,6 +599,8 @@ spec:
                   key: password
 status: {}
 ```
+
+</details>
 
 We're nearly there. We just need to configure the PostgreSQL database deployment. The process of creating the YAML will be very similar to what we did for the Azure Voting App deployment.
 
@@ -542,6 +625,11 @@ kubectl create deployment azure-voting-db \
 
 ```yaml
 env:
+  - name: POSTGRES_USER
+    valueFrom:
+      secretKeyRef:
+        name: azure-voting-db-secrets
+        key: username
   - name: POSTGRES_PASSWORD
     valueFrom:
       secretKeyRef:
@@ -554,6 +642,9 @@ env:
 > Your `azure-voting-db-deployment.yaml` file should now look like this:
 
 </div>
+
+<details>
+<summary>Click to expand output</summary>
 
 ```yaml
 apiVersion: apps/v1
@@ -580,6 +671,11 @@ spec:
           name: postgres
           resources: {}
           env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: azure-voting-db-secrets
+                  key: username
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -587,6 +683,8 @@ spec:
                   key: password
 status: {}
 ```
+
+</details>
 
 <div class="task" data-title="Task">
 
@@ -598,7 +696,9 @@ status: {}
 kubectl apply -f azure-voting-db-deployment.yaml
 ```
 
-Next, we need to create a service for the PostgreSQL database. This will allow the Azure Voting App to connect to the database. We can do this by using the `kubectl expose` command and specifying the deployment name. We can also use the same technique of creating a YAML file and then modifying it to suit our needs.
+With the database deployed in a pod, the front end application will need to be able to connect to it. We could use the Pod IP to connect to that will not be resilient since Pods are ephemeral and are given random IP addresses as they are created. So we'll need to create a service for the PostgreSQL database. Think of a service like an internal load balancer. This will give the front end app a single point of entry to connect to the database.
+
+We can create a service imperatively using the `kubectl expose` command and specifying the deployment name. However, we should use the same technique of creating a YAML file and then modifying it to suit our needs.
 
 <div class="task" data-title="Task">
 
@@ -654,11 +754,8 @@ Now that we have deployed the Azure Voting App and the PostgreSQL database, we c
 kubectl get deployments,pods,services
 ```
 
-<div class="info" data-title="Info">
-
-> You should see something like this:
-
-</div>
+<details>
+<summary>Click to expand output</summary>
 
 ```text
 NAME                               READY   UP-TO-DATE   AVAILABLE   AGE
@@ -675,7 +772,9 @@ service/azure-voting-db    ClusterIP   10.0.13.23   <none>        5432/TCP   3m
 service/kubernetes         ClusterIP   10.0.0.1     <none>        443/TCP    171m
 ```
 
-The application and services are now running, but we can't access it yet. If you noticed, there is no way to access the application from outside the cluster. We need to expose the application to the outside world. We can do this by using the `kubectl port-forward` command for now.
+</details>
+
+The application and services are now running, but we can't access it yet. If you noticed, there is no way to access the application from outside the cluster. We can temporarily connect to the service by using the `kubectl port-forward` command for now.
 
 <div class="task" data-title="Task">
 
@@ -695,7 +794,7 @@ kubectl port-forward service/azure-voting-app 8080:8080
 
 Now that we have exposed the application, we can access it from our local machine. Open a browser and go to `http://localhost:8080`. You should see the Azure Voting App.
 
-TODO: add screenshot
+![Azure Voting App on AKS](assets/azure-voting-app-on-aks.png)
 
 <div class="task" data-title="Task">
 
@@ -766,15 +865,20 @@ With the name of your Azure Key Vault, you can now store your secrets in the Azu
 
 <div class="task" data-title="Task">
 
-> Run the following command to store the `password` secret in the Azure Key Vault.
+> Run the following command to store the `username` and `password` secret in the Azure Key Vault.
 
 </div>
 
 ```bash
 az keyvault secret set \
   --vault-name $AKV_NAME \
-  --name azure-voting-db-password \
-  --value mypassword
+  --name database-username \
+  --value postgres
+
+az keyvault secret set \
+  --vault-name $AKV_NAME \
+  --name database-password \
+  --value postgres
 ```
 
 ### Using the Azure Key Vault secrets in Kubernetes
@@ -793,6 +897,9 @@ kubectl get pods \
   --selector 'app in (secrets-store-csi-driver, secrets-store-provider-azure)'
 ```
 
+<details>
+<summary>Click to expand output</summary>
+
 You should see something like this:
 
 ```text
@@ -804,6 +911,8 @@ aks-secrets-store-provider-azure-82nps   1/1     Running   0          3m35s
 aks-secrets-store-provider-azure-s6lbd   1/1     Running   0          3m35s
 aks-secrets-store-provider-azure-tcc7f   1/1     Running   0          3m35s
 ```
+
+</details>
 
 In order to use the Secret Store CSI driver, we need to create a SecretProviderClass. This is a Kubernetes object that tells the Secret Store CSI driver which secrets to mount and where to mount them. The authentication to the Azure Key Vault will be done using workload identity. This means that the pod will use the managed identity of the AKS cluster to authenticate to the Azure Key Vault.
 
@@ -846,7 +955,7 @@ Next, we need to create a SecretProviderClass.
 
 <div class="task" data-title="Task">
 
-> Run the following command to create a SecretProviderClass which uses your workload identity to access your key vault.
+> Run the following commands to retrieve information needed to create a SecretProviderClass using a [workload identity](https://learn.microsoft.com/azure/aks/csi-secrets-store-identity-access#access-with-an-azure-ad-workload-identity-preview) to access the key vault.
 
 </div>
 
@@ -884,15 +993,12 @@ spec:
     objects:  |
       array:
         - |
-          objectName: azure-voting-db-password # The name of the secret in the key vault
+          objectName: database-user            # The name of the secret in the key vault
           objectType: secret                   # The type of the secret in the key vault
+        - |
+          objectName: database-password
+          objectType: secret
     tenantId: "${TENANT_ID}"                   # The tenant ID of the key vault
-  secretObjects:                               # This is where you map your secrets to Kubernetes secrets
-    - secretName: azure-voting-db-secrets
-      type: Opaque
-      data:
-        - objectName: azure-voting-db-password
-          key: password
 EOF
 ```
 
@@ -929,11 +1035,10 @@ spec:
           name: postgres
           resources: {}
           env:
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: azure-voting-db-secrets
-                  key: password
+            - name: POSTGRES_USER_FILE
+              value: "/mnt/secrets-store/database-user"
+            - name: POSTGRES_PASSWORD_FILE
+              value: "/mnt/secrets-store/database-password"
           volumeMounts:
             - name: azure-voting-db-secrets
               mountPath: "/mnt/secrets-store"
@@ -976,7 +1081,7 @@ spec:
         app: azure-voting-app
     spec:
       containers:
-        - image: acruser123.azurecr.io/azure-voting-app:latest
+        - image: <REPLACE_THIS_WITH_YOUR_ACR_NAME>.azurecr.io/azure-voting-app:latest
           name: azure-voting-app
           ports:
             - containerPort: 8080
@@ -988,11 +1093,6 @@ spec:
               value: "Cats"
             - name: DATABASE_SERVER
               value: "azure-voting-db"
-            - name: DATABASE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: azure-voting-db-secrets
-                  key: password
           volumeMounts:
             - name: azure-voting-db-secrets
               mountPath: "/mnt/secrets-store"
@@ -1025,8 +1125,14 @@ kubectl apply -f azure-voting-app-deployment.yaml
 
 </div>
 
-```text
+```bash
 kubectl get deployments,pods,secrets
+```
+
+<details>
+<summary>Click to expand output</summary>
+
+```text
 NAME                               READY   UP-TO-DATE   AVAILABLE   AGE
 deployment.apps/azure-voting-app   1/1     1            1           149m
 deployment.apps/azure-voting-db    1/1     1            1           150m
@@ -1035,10 +1141,9 @@ NAME                                    READY   STATUS        RESTARTS   AGE
 pod/azure-voting-app-6bc9446ddb-xvdgc   1/1     Terminating   0          132m
 pod/azure-voting-app-7584b76bd5-xx285   1/1     Running       0          3s
 pod/azure-voting-db-6dd7cb94c6-nh8zg    1/1     Running       0          114s
-
-NAME                             TYPE     DATA   AGE
-secret/azure-voting-db-secrets   Opaque   1      112s
 ```
+
+</details>
 
 Did you notice the new secret? It was created by the CSI driver and contains the password for the database.
 
@@ -1052,7 +1157,7 @@ Did you notice the new secret? It was created by the CSI driver and contains the
 kubectl port-forward service/azure-voting-app 8080:8080
 ```
 
-Open a browser and navigate to http://localhost:8080. You should see the voting app again.
+Open a browser and navigate to http://localhost:8080. You should see the voting app is working again.
 
 ---
 
