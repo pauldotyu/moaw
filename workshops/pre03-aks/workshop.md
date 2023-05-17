@@ -44,6 +44,12 @@ az login
 
 This command should open up a browser window and prompt you to login to Azure. Once you have logged in, you can close the browser window and return to your terminal.
 
+<div class="tip" data-title="Tip">
+
+> If you hover your mouse over the block, you will see a copy button appear in the top right corner. Clicking this button will copy the contents of the block to your clipboard. Use this as much as possible to avoid typos.
+
+</div>
+
 ## Workshop instructions
 
 When you see these blocks of text, you should follow the instructions below.
@@ -369,7 +375,7 @@ az acr build \
 
 </div>
 
-## Creating your first YAML Deployment
+## Generating YAML manifests
 
 Earlier, we learned that Kubernetes uses YAML manifests to describe the state of your cluster.
 
@@ -862,16 +868,16 @@ Your lab environment already has an Azure Key Vault created for you.
 
 ```bash
 AKV_NAME=$(az resource list \
---resource-group $RG_NAME \
---resource-type Microsoft.KeyVault/vaults \
---query "[0].name" -o tsv)
+  --resource-group $RG_NAME \
+  --resource-type Microsoft.KeyVault/vaults \
+  --query "[0].name" -o tsv)
 ```
 
 With the name of your Azure Key Vault, you can now store your secrets in the Azure Key Vault.
 
 <div class="task" data-title="Task">
 
-> Run the following command to store the database username and password in the Azure Key Vault.
+> Run the following command to add the database username and password as secrets in the Azure Key Vault.
 
 </div>
 
@@ -920,6 +926,8 @@ aks-secrets-store-provider-azure-tcc7f   1/1     Running   0          3m35s
 
 </details>
 
+### Creating a ServiceAccount 
+
 In order to use the Secret Store CSI driver, we need to create a SecretProviderClass. This is a Kubernetes object that tells the Secret Store CSI driver which secrets to mount and where to mount them. The authentication to the Azure Key Vault will be done using [workload identity](https://learn.microsoft.com/azure/aks/csi-secrets-store-identity-access#access-with-an-azure-ad-workload-identity-preview). This means that the pod will use the managed identity of the AKS cluster to authenticate to the Azure Key Vault.
 
 To do this, we need to create a [ServiceAccount](https://kubernetes.io/docs/concepts/security/service-accounts/) which will use the managed identity of the AKS cluster and attached to the pod. This way, if your app running in the pod, needs to access resources in Azure, it can do so using the managed identity.
@@ -931,6 +939,9 @@ To do this, we need to create a [ServiceAccount](https://kubernetes.io/docs/conc
 </div>
 
 ```bash
+# set the name of the AKS cluster
+AKS_NAME=<your-aks-name>
+
 # get the client id of the managed identity
 USER_ASSIGNED_CLIENT_ID=$(az identity show \
   --resource-group $RG_NAME \
@@ -943,8 +954,8 @@ SERVICE_ACCOUNT_NAMESPACE=default
 # set the service account name
 SERVICE_ACCOUNT_NAME=azure-voting-app-serviceaccount
 
-# create the service account
-kubectl apply -f - <<EOF
+# create the service account manifest
+cat <<EOF > azure-voting-app-serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -955,7 +966,12 @@ metadata:
   name: ${SERVICE_ACCOUNT_NAME}
   namespace: ${SERVICE_ACCOUNT_NAMESPACE}
 EOF
+
+# apply the service account manifest
+kubectl apply -f azure-voting-app-serviceaccount.yaml
 ```
+
+### Creating a SecretProviderClass
 
 Next, we need to create a SecretProviderClass which will tell the Secret Store CSI driver which secrets to mount and where to retrieve them from.
 
@@ -984,7 +1000,7 @@ TENANT_ID=$(az identity show \
   --query tenantId -o tsv)
 
 # create a SecretProviderClass
-kubectl apply -f - <<EOF
+cat <<EOF > azure-voting-app-secretproviderclass.yaml
 apiVersion: secrets-store.csi.x-k8s.io/v1
 kind: SecretProviderClass
 metadata:
@@ -1006,7 +1022,12 @@ spec:
           objectType: secret
     tenantId: "${TENANT_ID}"                   # The tenant ID of the key vault
 EOF
+
+# apply the SecretProviderClass manifest
+kubectl apply -f azure-voting-app-secretproviderclass.yaml
 ```
+
+### Updating the database deployment
 
 Finally, we need to update our database and app deployments to use the ServiceAccount and mount the secrets into each pod.
 
@@ -1039,19 +1060,19 @@ volumeMounts:
 
 <div class="task" data-title="Task">
 
-> Next add a new line after the `volumeMounts:` block and make sure it is indented to the same level as the `containers:` block. Add this to enable the pod to use the service account and add a volume to mount the secrets into.
+> Next add a new line after the `volumeMounts:` block and add the code below to enable the pod to use the service account and add a volume to mount the secrets into. Make sure both `serviceAccountName:` and `volumes:` are indented to the same level as `containers:`.
 
 </div>
 
 ```yaml
 serviceAccountName: azure-voting-app-serviceaccount
-  volumes:
-    - name: azure-voting-db-secrets
-      csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: azure-keyvault-secrets
+volumes:
+  - name: azure-voting-db-secrets
+    csi:
+      driver: secrets-store.csi.k8s.io
+      readOnly: true
+      volumeAttributes:
+        secretProviderClass: azure-keyvault-secrets
 ```
 
 Your final `azure-voting-db-deployment.yaml` file should look like this.
@@ -1104,6 +1125,8 @@ status: {}
 ```
 
 </details>
+
+### Updating the app deployment
 
 <div class="task" data-title="Task">
 
@@ -1207,6 +1230,8 @@ status: {}
 
 </details>
 
+### Deploying the updated YAML files
+
 <div class="task" data-title="Task">
 
 > Deploy the updated YAML files to your cluster.
@@ -1286,7 +1311,9 @@ kubectl delete pod --all
 
 Wait for the pods to restart and then run the `kubectl port-forward` command again, and refresh the browser. You should see that the votes have been reset to 0 😭
 
-### Using Azure Disk for PGDATA
+### Creating a PVC for PGDATA
+
+When a PostgreSQL container is created, its data (PGDATA) points to a local directory `/var/lib/postgresql/data`. When the container crashes or restarts, the data is gone and the container starts with a clean slate.
 
 This can be solved by leveraging persistent storage; more specifically, by taking advantage of the [Azure CSI drivers and storage classes](https://learn.microsoft.com/azure/aks/csi-storage-drivers) that have been pre-deployed into your cluster.
 
@@ -1322,11 +1349,13 @@ Typically for persistent storage, you would create a [Persistent Volume (PV)](ht
 
 <div class="task" data-title="Task">
 
-> Open the `azure-voting-db-deployment.yaml` file and add the following YAML at the top of the file.
+> Create a new `azure-voting-app-pvc.yaml` manifest.
 
 </div>
 
-```yaml
+```bash
+# create the manifest
+cat <<EOF > azure-voting-app-pvc.yaml
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -1337,23 +1366,22 @@ spec:
   resources:
     requests:
       storage: 10Gi
-  storageClassName: managed-csi-premium
----
+  storageClassName: managed-csi
+EOF
+
+# apply the manifest
+kubectl apply -f azure-voting-app-pvc.yaml
 ```
 
-<div class="info" data-title="Info">
+### Updating the database manifest to be a StatefulSet and use the PVC
 
-> Notice the YAML ended with a `---`, which is a YAML separator. This allows us to define multiple resources in a single file.
+With the PVC created, we can now update the `azure-voting-db-deployment.yaml` manifest to use it.
 
-</div>
-
-### Updating the Deployment manifest to use the PVC
-
-With the PVC created, we can now update the Deployment manifest to use it.
+But first, now that we are using a PVC, we should update our database manifest to use a [StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) instead of a Deployment. This will ensure that the PVC is not deleted when the pod is deleted.
 
 <div class="task" data-title="Task">
 
-> In the Deployment manifest, add a volume to the pod definition. You should already have a `volumes` section in the YAML. Add the following YAML to the end of the `volumes` section.
+> Open the `azure-voting-db-deployment.yaml` manifest and change `kind: Deployment` to `kind: StatefulSet`. Also, since we are using a StatefulSet, we need to remove the ` strategy: {}` section from the manifest. Then add a volume to the pod definition. You should already have a `volumes` section in the YAML. Add the following YAML to the end of the `volumes` section.
 
 </div>
 
@@ -1365,7 +1393,7 @@ With the PVC created, we can now update the Deployment manifest to use it.
 
 <div class="task" data-title="Task">
 
-> Also in the Deployment manifest, add a volume mount to the container definition. You should already have a `volumeMounts` section in the YAML. Add the following YAML to the end of the `volumeMounts` section.
+> Also in the `azure-voting-db-deployment.yaml` manifest, add a volume mount to the container definition. You should already have a `volumeMounts` section in the YAML. Add the following YAML to the end of the `volumeMounts` section.
 >
 > NOTE: The `subPath` property allows us to mount a subdirectory of the volume into the container.
 
@@ -1385,20 +1413,8 @@ With the PVC created, we can now update the Deployment manifest to use it.
 <summary>Click to expand code</summary>
 
 ```yaml
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: pvc-azuredisk
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 10Gi
-  storageClassName: managed-csi-premium
----
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   creationTimestamp: null
   labels:
@@ -1409,7 +1425,6 @@ spec:
   selector:
     matchLabels:
       app: azure-voting-db
-  strategy: {}
   template:
     metadata:
       creationTimestamp: null
@@ -1417,21 +1432,21 @@ spec:
         app: azure-voting-db
     spec:
       containers:
-        - image: postgres
-          name: postgres
-          resources: {}
-          env:
-            - name: POSTGRES_USER_FILE
-              value: "/mnt/secrets-store/database-user"
-            - name: POSTGRES_PASSWORD_FILE
-              value: "/mnt/secrets-store/database-password"
-          volumeMounts:
-            - name: azure-voting-db-secrets
-              mountPath: "/mnt/secrets-store"
-              readOnly: true
-            - name: azure-voting-db-data
-              mountPath: "/var/lib/postgresql/data"
-              subPath: "data"
+      - image: postgres
+        name: postgres
+        resources: {}
+        env:
+        - name: POSTGRES_USER_FILE
+          value: "/mnt/secrets-store/database-user"
+        - name: POSTGRES_PASSWORD_FILE
+          value: "/mnt/secrets-store/database-password"
+        volumeMounts:
+        - name: azure-voting-db-secrets
+          mountPath: "/mnt/secrets-store"
+          readOnly: true
+        - name: azure-voting-db-data
+          mountPath: "/var/lib/postgresql/data"
+          subPath: "data"
       serviceAccountName: azure-voting-app-serviceaccount
       volumes:
         - name: azure-voting-db-secrets
@@ -1443,6 +1458,7 @@ spec:
         - name: azure-voting-db-data
           persistentVolumeClaim:
             claimName: pvc-azuredisk
+
 status: {}
 ```
 
@@ -1475,20 +1491,30 @@ You should see the following output with a `STATUS` of `Bound`. This means the P
 
 ```bash
 NAME            STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS          AGE
-pvc-azuredisk   Bound    pvc-e25b6853-21c9-493c-8d19-f4bae2e29be8   10Gi       RWO            managed-csi-premium   2m9s
+pvc-azuredisk   Bound    pvc-e25b6853-21c9-493c-8d19-f4bae2e29be8   10Gi       RWO            managed-csi           2m9s
 ```
 
 </details>
 
 <div class="task" data-title="Task">
 
-> Use the `kubectl port-forward` command to access the app again. Refresh the browser, add some votes, then delete the pods as we did at the beginning of this section. When you refresh the browser, you should see that the vote data has persisted even though the pods were deleted.
+> Run the following command to check the status of the database pod.
+
+</div>
+
+```bash
+kubectl get pod -l app=azure-voting-db
+```
+
+<div class="task" data-title="Task">
+
+> When the database pod is running, use the `kubectl port-forward` command to access the app again. Refresh the browser, add some votes, then delete the pods as we did at the beginning of this section. When you refresh the browser, you should see that the vote data has persisted even though the pods were deleted.
 
 </div>
 
 ---
 
-## Sharing your app with the world
+## Sharing your app
 
 Up until now, we've been accessing our app using port forwarding. This is great for testing, but not very useful if you want users to use your app.
 
@@ -1541,7 +1567,8 @@ Our deployments do not have a sidecar container. Let's reploy our manifests to t
 </div>
 
 ```bash
-kubectl delete deploy --all
+kubectl delete -f azure-voting-db-deployment.yaml
+kubectl delete -f azure-voting-app-deployment.yaml
 kubectl apply -f azure-voting-db-deployment.yaml
 kubectl apply -f azure-voting-app-deployment.yaml
 ```
@@ -1578,7 +1605,8 @@ Now that we have Istio installed and our app is running with the Istio sidecar, 
 </div>
 
 ```yaml
----
+# create a manifest to expose the app using the Istio Ingress Gateway
+cat <<EOF > azure-voting-app-servicemesh.yaml
 apiVersion: networking.istio.io/v1alpha3
 kind: Gateway
 metadata:
@@ -1609,110 +1637,13 @@ spec:
             host: azure-voting-app
             port:
               number: 8080
+EOF
+
+# apply the manifest
+kubectl apply -f azure-voting-app-servicemesh.yaml
 ```
 
 Here, we are creating a `Gateway` resource that will route traffic to our app using the `aks-istio-ingressgateway-external` service. The gateway will listen on port 80 and route traffic to any host. Next, we create a `VirtualService` resource that will route traffic to our backend `Service` resource using the Gateway resource we just created.
-
-<div class="info" data-title="Info">
-
-> Your `azure-voting-db-deployment.yaml` file should look like this:
-
-</div>
-
-<details>
-<summary>Click to expand code</summary>
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  creationTimestamp: null
-  labels:
-    app: azure-voting-app
-  name: azure-voting-app
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: azure-voting-app
-  strategy: {}
-  template:
-    metadata:
-      creationTimestamp: null
-      labels:
-        app: azure-voting-app
-    spec:
-      containers:
-        - image: acruser197.azurecr.io/azure-voting-app:v1
-          name: azure-voting-app
-          ports:
-            - containerPort: 8080
-          resources: {}
-          env:
-            - name: FIRST_VALUE
-              value: "Dogs"
-            - name: SECOND_VALUE
-              value: "Cats"
-            - name: DATABASE_SERVER
-              value: "azure-voting-db"
-          volumeMounts:
-            - name: azure-voting-db-secrets
-              mountPath: "/mnt/secrets-store"
-              readOnly: true
-      serviceAccountName: azure-voting-app-serviceaccount
-      volumes:
-        - name: azure-voting-db-secrets
-          csi:
-            driver: secrets-store.csi.k8s.io
-            readOnly: true
-            volumeAttributes:
-              secretProviderClass: azure-keyvault-secrets
-status: {}
----
-apiVersion: networking.istio.io/v1alpha3
-kind: Gateway
-metadata:
-  name: azure-voting-app-gateway
-spec:
-  selector:
-    istio: aks-istio-ingressgateway-external
-  servers:
-    - port:
-        number: 80
-        name: http
-        protocol: HTTP
-      hosts:
-        - "*"
----
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: azure-voting-app-virtualservice
-spec:
-  hosts:
-    - "*"
-  gateways:
-    - azure-voting-app-gateway
-  http:
-    - route:
-        - destination:
-            host: azure-voting-app
-            port:
-              number: 8080
-
-```
-
-</details>
-
-<div class="task" data-title="Task">
-
-> Run the following command to create an Istio Gateway and Virtual Service.
-
-</div>
-
-```bash
-kubectl apply -f azure-voting-app-service.yaml
-```
 
 <div class="task" data-title="Task">
 
@@ -1825,16 +1756,117 @@ As your app becomes more popular, you'll need to scale it to handle the increase
 
 This is where we take a different approach and deploy KEDA to scale our app. [KEDA is a Kubernetes-based Event Driven Autoscaler](https://keda.sh/). It allows you to scale your app on basically any metric. If there is a metric that KEDA can can access to, it can scale based on it. Under the covers KEDA, looks at the metrics and your scaling rules and eventually creates a HPA to do the actual scaling. 
 
-### Scaling based on CPU utilization
+The AKS add-on for KEDA has already been installed in your cluster.
+
+### Setting request and limits
+
+When scaling on a performance metric, we need to let Kubernetes know how much compute and memory resources to allocate for each pod. We do this by setting the `requests` and `limits` in our deployment. The `requests` are the minimum amount of resources that Kubernetes will allocate for each pod. The `limits` are the maximum amount of resources that Kubernetes will allocate for each pod. Kubernetes will use these values to determine how many pods to run based on the amount of resources available on the nodes in the cluster.
 
 <div class="task" data-title="Task">
 
-> Open the `azure-voting-app-deployment.yaml` file and add the following YAML to the end of it. Here we will scale the application up when the CPU utilization is greater than 50%.
+> Open the `azure-voting-app-deployment.yaml` file, find the empty `resources: {}` block and replace it with the following.
 
 </div>
 
 ```yaml
----
+resources:
+  requests:
+    cpu: 4m
+    memory: 55Mi
+  limits:
+    cpu: 6m
+    memory: 75Mi
+```
+
+<div class="info" data-title="Info">
+
+> Your `azure-voting-db-deployment.yaml` file should now look like this:
+
+</div>
+
+<details>
+<summary>Click to expand code</summary>
+
+```yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  creationTimestamp: null
+  labels:
+    app: azure-voting-db
+  name: azure-voting-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: azure-voting-db
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: azure-voting-db
+    spec:
+      containers:
+      - image: postgres
+        name: postgres
+        resources:
+          requests:
+            cpu: 4m
+            memory: 55Mi
+          limits:
+            cpu: 6m
+            memory: 75Mi
+        env:
+        - name: POSTGRES_USER_FILE
+          value: "/mnt/secrets-store/database-user"
+        - name: POSTGRES_PASSWORD_FILE
+          value: "/mnt/secrets-store/database-password"
+        volumeMounts:
+        - name: azure-voting-db-secrets
+          mountPath: "/mnt/secrets-store"
+          readOnly: true
+        - name: azure-voting-db-data
+          mountPath: "/var/lib/postgresql/data"
+          subPath: "data"
+      serviceAccountName: azure-voting-app-serviceaccount
+      volumes:
+        - name: azure-voting-db-secrets
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: azure-keyvault-secrets
+        - name: azure-voting-db-data
+          persistentVolumeClaim:
+            claimName: pvc-azuredisk
+
+status: {}
+```
+
+</details>
+
+
+<div class="task" data-title="Task">
+
+> Run the following command to deploy the updated manifest.
+
+</div>
+
+```bash
+kubectl apply -f azure-voting-app-deployment.yaml
+```
+
+### Scaling with KEDA based on CPU utilization
+
+<div class="task" data-title="Task">
+
+> Create a new `azure-voting-app-scaledobject.yaml` manifest for KEDA. Here we will scale the application up when the CPU utilization is greater than 50%.
+
+</div>
+
+```yaml
+# create a new file called azure-voting-app-scaledobject.yaml
+cat <<EOF > azure-voting-app-scaledobject.yaml
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
@@ -1847,6 +1879,10 @@ spec:
       metricType: Utilization
       metadata:
         value: "50"
+EOF
+
+# apply the manifest
+kubectl apply -f azure-voting-app-scaledobject.yaml
 ```
 
 <div class="info" data-title="Info">
@@ -1854,16 +1890,6 @@ spec:
 > The default values for minimum and maximum replica counts weren't included in our manifest above, but it will default to 0 and 100 respectively. In some cases, the minimum defaults to 1 so consult the documentation for the specific scaler you are using.
 
 </div>
-
-<div class="task" data-title="Task">
-
-> Run the following command to create the ScaledObject.
-
-</div>
-
-```bash
-kubectl apply -f azure-voting-app-deployment.yaml
-```
 
 <div class="task" data-title="Task">
 
@@ -1882,41 +1908,53 @@ Wait until the `READY` column shows `True`
 
 ```text
 NAME                            SCALETARGETKIND      SCALETARGETNAME    MIN   MAX   TRIGGERS   AUTHENTICATION   READY   ACTIVE   FALLBACK   AGE
-azure-voting-app-scaledobject   apps/v1.Deployment   azure-voting-app               cpu                         True    True     Unknown    3m40s
+azure-voting-app-scaledobject   apps/v1.Deployment   azure-voting-app               cpu                         True    True     Unknown    16s
 ```
 
 </details>
 
-### Setting request and limits
+### Load testing your app
 
-When scaling on a performance metric, we need to let Kubernetes know how much compute and memory resources to allocate for each pod. We do this by setting the `requests` and `limits` in our deployment. The `requests` are the minimum amount of resources that Kubernetes will allocate for each pod. The `limits` are the maximum amount of resources that Kubernetes will allocate for each pod. Kubernetes will use these values to determine how many pods to run based on the amount of resources available on the nodes in the cluster.
+Now that our app is enabled for autoscaling, let's generate some load on our app and watch KEDA scale our app.
+
+We'll use the [Azure Load Testing](https://learn.microsoft.com/azure/load-testing/overview-what-is-azure-load-testing) service to generate load on our app and watch KEDA scale our app.
+
 
 <div class="task" data-title="Task">
 
-> Open the `azure-voting-app-deployment.yaml` file and find the empty `resources: {}` block in your `Deployment`. Update it 
+> In the Azure Portal, navigate to your resource group and click on your Azure Load Testing resource. Click the **Quick test** button to create a new test.
+
+> In the **Quick test** blade, enter your ingress IP as the URL. Set the number of virtual users to **250**, a ramp up time of **60**, and the test duration to **240** seconds. Click the **Run test** button to start the test. 
 
 </div>
 
-```yaml
-resources:
-  requests:
-    cpu: 4m
-    memory: 55Mi
-  limits:
-    cpu: 6m
-    memory: 75Mi
-```
+<div class="info" data-title="Information">
 
-### Load testing your app
+> If you are familiar with creating JMeter tests, you can also create a JMeter test file and upload it to Azure Load Testing.
 
-Let's use the Azure Load Testing service to generate load on our app and watch KEDA scale our app.
+</div>
 
-Run 100 users
+<div class="task" data-title="Task">
+
+> As the test is running, run the following command to watch the deployment scale.
+
+</div>
 
 ```bash
-kubectl get deploy -w
+kubectl get deployment azure-voting-app -w
 ```
 
+<div class="task" data-title="Task">
+
+> In a different terminal tab, you can also run the following command to watch the Horizontal Pod Autoscaler reporting metrics as well.
+
+</div>
+
+```bash
+kubectl get hpa -w
+```
+
+After a few minutes, you should start to see the number of replicas increase as the load test runs.
 
 ---
 
