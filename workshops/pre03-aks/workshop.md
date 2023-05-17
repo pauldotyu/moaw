@@ -1732,13 +1732,15 @@ Our app is now accessible to the world!
 
 ---
 
-## BONUS: Observing your app
+## Observing your app
 
-With the app running and exposed to the world, we need a way to observe what's happening within the cluster. In AKS, we can use [Azure Container Insights](https://learn.microsoft.com/azure/azure-monitor/containers/container-insights-overview) to get insights into our cluster. Additionally, we can leverage [Azure Monitor managed service for Prometheus](https://learn.microsoft.com/en-Us/azure/azure-monitor/essentials/prometheus-metrics-overview) and [Azure Managed Grafana](https://learn.microsoft.com/en-us/azure/managed-grafana/overview) to get insights into our cluster using tooling that is very popular in the Cloud Native ecosystem.
+Now that the app is fully deployed, we need a way to observe what's happening within the cluster. In AKS, we can use [Azure Container Insights](https://learn.microsoft.com/azure/azure-monitor/containers/container-insights-overview) to get insights into our cluster. Additionally, we can leverage [Azure Monitor managed service for Prometheus](https://learn.microsoft.com/en-Us/azure/azure-monitor/essentials/prometheus-metrics-overview) and [Azure Managed Grafana](https://learn.microsoft.com/en-us/azure/managed-grafana/overview) to get insights into our cluster using tooling that is very popular in the Cloud Native ecosystem.
 
-### Azure Monitor for Containers
+Let's explore both options
 
-Your AKS cluster has been provisioned with Azure Monitor for Containers enabled. This means that you can view metrics and logs for your cluster and the applications running in it.
+### Azure Container Insights
+
+Your AKS cluster has been provisioned with Azure Container Insights enabled. This means that you can view metrics and logs for your cluster and the applications running in it.
 
 <div class="task" data-title="Task">
 
@@ -1746,11 +1748,13 @@ Your AKS cluster has been provisioned with Azure Monitor for Containers enabled.
 
 </div>
 
+![Azure Container Insights](assets/container-insights.png)
+
 As you click through the different metrics and logs, you'll notice that you can view metrics and logs for the cluster as a whole, as well as for individual pods. This is very useful for troubleshooting issues.
 
 ### Prometheus and Grafana
 
-Azure Monitor for Containers provides a lot of useful information, but it doesn't provide everything. For example, it doesn't provide information about the Istio sidecar containers. To get this information, we'll need to use Prometheus and Grafana. In the AKS Insights tab, you'll notice that there is a link to enable Prometheus. Let's enable it.
+Azure Container Insights provides a lot of useful information, but it doesn't provide everything. For example, it doesn't provide information about the traffic flowing through Istio sidecar proxies. To get this information, we'll need to use Prometheus and Grafana. In the Insights tab, you'll notice that there is a link to enable Prometheus. Let's enable it.
 
 <div class="task" data-title="Task">
 
@@ -1758,21 +1762,74 @@ Azure Monitor for Containers provides a lot of useful information, but it doesn'
 
 </div>
 
-It will take a few minutes for your cluster to be onboarded. Once it's onboarded, you'll see a link to Grafana. Click on the link to open Grafana, then click the link to **Browse dashboards**.
+![Monitor settings](assets/cluster-monitor-settings.png)
 
-The Azure Managed Grafana instance is pre-configured with a number of dashboards. Let's take a look at some of the Kubernetes dashboards and import the Istio workload dashboard.
+![Prometheus and Grafana](assets/enable-prometheus-grafana.png)
+
+It will take a few minutes for your cluster to be onboarded. Once it's onboarded, you'll see a link to Grafana. 
+
+
+<div class="task" data-title="Task">
+
+> Click on the **View Grafana** button then click the **Browse dashboards** link to open Grafana.
+
+</div>
+
+![Grafana](assets/open-grafana.png)
+
+The Azure Managed Grafana instance is pre-configured with Azure Managed Prometheus as a datashource and also includes a some dashboards. Let's take a look at some of the Kubernetes dashboards and import the Istio workload dashboard.
+
+<div class="task" data-title="Task">
+
+> In Grafana, click on the Dashboards button, then click Browse. In the list of dashboards, click on the Managed Prometheus folder to expand a list of dashboards. Click on the **Kubernetes / Compute Resources / Cluster** dashboard to open it.
+
+</div>
+
+![Browse Kubernetes dashboards](assets/browse-dashboards.png)
+
+![Kubernetes dashboard](assets/kubernetes-dashboard.png)
+
+You can also browse other dashboards that are available in the [Grafana marketplace](https://grafana.com/grafana/dashboards/). 
+
+<div class="tip" data-title="Tip">
+
+> Here is a list of all the Grafana dashboards that have been published by the Azure Monitor team: https://grafana.com/orgs/azuremonitorteam/dashboards
+
+</div>
+
+To view traffic flowing through the Istio service mesh, you can use the Istio Workload dashboard. This dashboard shows you the traffic flowing through the Istio sidecar proxies.
+
+<div class="task" data-title="Task">
+
+> Place your mouse cursor over the Dashboard button again to expand the menu, then click on the Import button. In the Import dialog, enter **7630** in the Grafana.com Dashboard field and click **Load**. Select your Managed Prometheus instance as the datasource then click **Import** to import the dashboard.
+
+</div>
+
+![Import dashboard](assets/import-dashboard.png)
+
+![Import Istio workload dashboard](assets/import-istio-dashboard.png)
+
+![Istio Workload dashboard datasource](assets/istio-prometheus-datasource.png)
+
+Now you should see the Istio Workload dashboard.
+
+![Istio Workload dashboard](assets/istio-workload-dashboard.png)
+
+These should be enough to get you started. Feel free to explore the other dashboards and create your own.
 
 ---
 
-## BONUS: Scaling your app
+## Scaling your app
 
-As your app becomes more popular, you'll need to scale it to handle the increased load. In AKS, you can scale your app by increasing the number of replicas in your deployment. The Kubernetes Horizontal Pod Autoscaler (HPA) will automatically scale your app based on CPU utilization. Let's take this a step further and implement KEDA to scale our app. KEDA is a Kubernetes-based Event Driven Autoscaler. It allows you to scale your app based on events, such as messages in a queue. It works with Horizontal Pod Autoscaler to scale your app based on events.
+As your app becomes more popular, you'll need to scale it to handle the increased load. In AKS, you can scale your app by increasing the number of replicas in your deployment. The Kubernetes Horizontal Pod Autoscaler (HPA) will automatically scale your app based on CPU and/or memory utilization. But not all workloads rely on these metrics for scaling. If say, you need to scale your workload based on the number of items in a queue, HPA will not be sufficient.
+
+This is where we take a different approach and deploy KEDA to scale our app. [KEDA is a Kubernetes-based Event Driven Autoscaler](https://keda.sh/). It allows you to scale your app on basically any metric. If there is a metric that KEDA can can access to, it can scale based on it. Under the covers KEDA, looks at the metrics and your scaling rules and eventually creates a HPA to do the actual scaling. 
 
 ### Scaling based on CPU utilization
 
 <div class="task" data-title="Task">
 
-> Open the `azure-voting-app-deployment.yaml` file and add the following YAML to the end of it.
+> Open the `azure-voting-app-deployment.yaml` file and add the following YAML to the end of it. Here we will scale the application up when the CPU utilization is greater than 50%.
 
 </div>
 
@@ -1791,6 +1848,12 @@ spec:
       metadata:
         value: "50"
 ```
+
+<div class="info" data-title="Info">
+
+> The default values for minimum and maximum replica counts weren't included in our manifest above, but it will default to 0 and 100 respectively. In some cases, the minimum defaults to 1 so consult the documentation for the specific scaler you are using.
+
+</div>
 
 <div class="task" data-title="Task">
 
