@@ -6,7 +6,7 @@ short_title: Getting Started with AKS # Optional. Short title displayed in the h
 description: This is a workshop for AKS # Required.
 level: beginner # Required. Can be 'beginner', 'intermediate' or 'advanced'
 authors: # Required. You can add as many authors as needed
-  - "@pauldotyu"
+  - "Paul Yu"
 contacts: # Required. Must match the number of authors
   - "@pauldotyu"
 duration_minutes: 20 # Required. Estimated duration in minutes
@@ -22,7 +22,21 @@ tags: kubernetes, azure # Required. Tags for filtering and searching
 #   - Section 2 title
 ---
 
-# Before we begin
+# Overview
+
+In this workshop, you will learn the basics of Kubernetes and how to package applications for delivery to Azure Kubernetes Service. The goal of this workshop is to cover as many application deployment scenarios as possible. We will start with a simple application and then progress to more complex scenarios by introducing integrations with other Azure services and open source tooling common in cloud native apps.
+
+## Objectives
+
+The objectives of this workshop are to:
+
+- Introduce you to the basics of Kubernetes
+- Deploy an application to Azure Kubernetes Service
+- Securing application secrets using Azure Key Vault
+- Persisting application data using Azure File Storage
+- Exposing applications using the Istio Ingress Gateway
+- Monitoring applications using Azure Monitor and Prometheus + Grafana
+- Scaling applications using KEDA
 
 ## Prerequisites
 
@@ -92,7 +106,7 @@ This section of the workshop will introduce you to the basics of Kubernetes. We'
 
 ## Working with `kubectl`
 
-Kubernetes administartors will commonly interact with the Kuberetes API server using the [`kubectl` command line tool](https://kubernetes.io/docs/reference/kubectl/). As you progress through your cloud natvie journey, you will find that there are other tools available for deploying, managing, and monitoring Kubernetes clusters. However, basic knowledge of `kubectl` is essential.
+Kubernetes administrators will commonly interact with the Kubernetes API server using the [`kubectl` command line tool](https://kubernetes.io/docs/reference/kubectl/). As you progress through your cloud native journey, you will find that there are other tools available for deploying, managing, and monitoring Kubernetes clusters. However, basic knowledge of `kubectl` is essential.
 
 ### Connecting to your AKS cluster
 
@@ -379,7 +393,7 @@ az acr build \
 
 Earlier, we learned that Kubernetes uses YAML manifests to describe the state of your cluster.
 
-In the previous secion, we used `kubectl` to run a pod using both the imperative and declarative approaches. 
+In the previous section, we used `kubectl` to run a pod using both the imperative and declarative approaches. 
 
 But, did you know that `kubectl` can also be used to generate YAML manifests for you? Let's take a look at how we can do that to generate a YAML file for our app.
 
@@ -1518,7 +1532,7 @@ kubectl get pod -l app=azure-voting-db
 
 Up until now, we've been accessing our app using port forwarding. This is great for testing, but not very useful if you want users to use your app.
 
-To expose your app to users, we can leaverage the newly announced [Istio service mesh add-on for AKS](https://learn.microsoft.com/azure/aks/istio-deploy-addon). Istio is a service mesh that provides a lot of useful features, including [security, observability, traffic management, and more](https://istio.io/latest/docs/concepts/). We won't be using all the features of Istio, We will however, leverage the [Ingress Gateway](https://istio.io/latest/docs/tasks/traffic-management/ingress/ingress-control/) to expose our app outside of the cluster.
+To expose your app to users, we can leverage the newly announced [Istio service mesh add-on for AKS](https://learn.microsoft.com/azure/aks/istio-deploy-addon). Istio is a service mesh that provides a lot of useful features, including [security, observability, traffic management, and more](https://istio.io/latest/docs/concepts/). We won't be using all the features of Istio, We will however, leverage the [Ingress Gateway](https://istio.io/latest/docs/tasks/traffic-management/ingress/ingress-control/) to expose our app outside of the cluster.
 
 ### Setting up Istio
 
@@ -1558,7 +1572,7 @@ Istio works by injecting a sidecar container into each pod. This sidecar contain
 kubectl label namespace default istio.io/rev=asm-1-17
 ```
 
-Our deployments do not have a sidecar container. Let's reploy our manifests to trigger Istio to inject sidecar containers into our pods.
+Our deployments do not have a sidecar container. Let's redeploy our manifests to trigger Istio to inject sidecar containers into our pods.
 
 <div class="task" data-title="Task">
 
@@ -1575,7 +1589,7 @@ kubectl apply -f azure-voting-app-deployment.yaml
 
 <div class="info" data-title="Info">
 
-> Run the following command to see the status of the pods. You should now wee each pod is running two containers, the app container and the Istio sidecar container.
+> Run the following command to see the status of the pods. You should now see each pod is running two containers, the app container and the Istio sidecar container.
 
 </div>
 
@@ -1588,8 +1602,9 @@ kubectl get pods
 
 ```text
 NAME                                READY   STATUS    RESTARTS   AGE
-azure-voting-app-7584b76bd5-mwg4q   2/2     Running   0          69s
-azure-voting-db-8467b69b99-dg95g    2/2     Running   0          79s
+azure-voting-app-777cbb5494-8tnc7   2/2     Running   0          44s
+azure-voting-db-0                   2/2     Running   0          46s
+azure-voting-db-765c8d56c4-snq96    1/1     Running   0          4m10s
 ```
 
 </details>
@@ -1600,7 +1615,7 @@ Now that we have Istio installed and our app is running with the Istio sidecar, 
 
 <div class="task" data-title="Task">
 
-> Open the `azure-voting-app-service.yaml` file and add the following lines to the end of it.
+> Run the following command to create Istio resources.
 
 </div>
 
@@ -1699,7 +1714,6 @@ Azure Container Insights provides a lot of useful information, but it doesn't pr
 
 It will take a few minutes for your cluster to be onboarded. Once it's onboarded, you'll see a link to Grafana. 
 
-
 <div class="task" data-title="Task">
 
 > Click on the **View Grafana** button then click the **Browse dashboards** link to open Grafana.
@@ -1708,7 +1722,7 @@ It will take a few minutes for your cluster to be onboarded. Once it's onboarded
 
 ![Grafana](assets/open-grafana.png)
 
-The Azure Managed Grafana instance is pre-configured with Azure Managed Prometheus as a datashource and also includes a some dashboards. Let's take a look at some of the Kubernetes dashboards and import the Istio workload dashboard.
+The Azure Managed Grafana instance is pre-configured with Azure Managed Prometheus as a data source and also includes a some dashboards. Let's take a look at some of the Kubernetes dashboards and import the Istio workload dashboard.
 
 <div class="task" data-title="Task">
 
@@ -1727,24 +1741,6 @@ You can also browse other dashboards that are available in the [Grafana marketpl
 > Here is a list of all the Grafana dashboards that have been published by the Azure Monitor team: https://grafana.com/orgs/azuremonitorteam/dashboards
 
 </div>
-
-To view traffic flowing through the Istio service mesh, you can use the Istio Workload dashboard. This dashboard shows you the traffic flowing through the Istio sidecar proxies.
-
-<div class="task" data-title="Task">
-
-> Place your mouse cursor over the Dashboard button again to expand the menu, then click on the Import button. In the Import dialog, enter **7630** in the Grafana.com Dashboard field and click **Load**. Select your Managed Prometheus instance as the datasource then click **Import** to import the dashboard.
-
-</div>
-
-![Import dashboard](assets/import-dashboard.png)
-
-![Import Istio workload dashboard](assets/import-istio-dashboard.png)
-
-![Istio Workload dashboard datasource](assets/istio-prometheus-datasource.png)
-
-Now you should see the Istio Workload dashboard.
-
-![Istio Workload dashboard](assets/istio-workload-dashboard.png)
 
 These should be enough to get you started. Feel free to explore the other dashboards and create your own.
 
@@ -1922,9 +1918,7 @@ We'll use the [Azure Load Testing](https://learn.microsoft.com/azure/load-testin
 
 <div class="task" data-title="Task">
 
-> In the Azure Portal, navigate to your resource group and click on your Azure Load Testing resource. Click the **Quick test** button to create a new test.
-
-> In the **Quick test** blade, enter your ingress IP as the URL. Set the number of virtual users to **250**, a ramp up time of **60**, and the test duration to **240** seconds. Click the **Run test** button to start the test. 
+> In the Azure Portal, navigate to your shared resource group and click on your Azure Load Testing resource. Click the **Quick test** button to create a new test. In the **Quick test** blade, enter your ingress IP as the URL. Set the number of virtual users to **250**, a ramp up time of **60**, and the test duration to **240** seconds. Click the **Run test** button to start the test. 
 
 </div>
 
@@ -1933,6 +1927,8 @@ We'll use the [Azure Load Testing](https://learn.microsoft.com/azure/load-testin
 > If you are familiar with creating JMeter tests, you can also create a JMeter test file and upload it to Azure Load Testing.
 
 </div>
+
+![Azure Load Testing](assets/load-test-setup.png)
 
 <div class="task" data-title="Task">
 
@@ -1958,18 +1954,18 @@ After a few minutes, you should start to see the number of replicas increase as 
 
 ---
 
-## BONUS: Automating deployments
+## Summary
 
-Up until now, we've been manually deploying our app. This is fine for testing, but it's not a good practice for production. In production, you'll want to automate your deployments. In AKS, you can use Azure DevOps to automate your deployments. Azure DevOps is a set of tools that allow you to automate your deployments. It includes a build pipeline, a release pipeline, and a set of tools for managing your infrastructure.
+Congratulations on completing this lab! 
 
----
+In this lab, you learned how to:
 
-## Resources
+- Deploy an application to Kubernetes
+- Secure application secrets
+- Add persistent storage to your stateful application
+- Expose your application to the internet
+- Scale and load test your application
 
-- https://kubernetes.io/docs/tasks/inject-data-application/distribute-credentials-secure/#define-container-environment-variables-using-secret-data
-- https://azure.github.io/Cloud-Native/cnny-2023/bring-your-app-day-2#implement-secrets-using-azure-key-vault
-- https://learn.microsoft.com/en-us/azure/aks/csi-secrets-store-driver
-- https://learn.microsoft.com/en-us/azure/aks/csi-secrets-store-identity-access
-- https://stackoverflow.com/questions/71543741/reading-in-values-from-mnt-secrets-store-after-integration-akv-with-aks-using
-- https://azure.github.io/Cloud-Native/cnny-2023/fundamentals-day-4#persistent-storage-on-aks
+To learn more about Kubernetes, check out the [Kubernetes Learning Path](https://azure.microsoft.com/resources/kubernetes-learning-path/) and be sure to check out the [Kubernetes documentation](https://docs.microsoft.com/azure/aks/). For additional lab content, be sure to check out our [OSS Labs Repo](https://aka.ms/oss-labs/)!.
 
+If you have any questions or feedback, please let me know in the comments below or reach out to me on Twitter [@pauldotyu](https://twitter.com/pauldotyu), Mastodon [@pau@hachyderm.io](https://hachyderm.io/@paul), or LinkedIn [/in/yupau](https://www.linkedin.com/in/yupaul/)
