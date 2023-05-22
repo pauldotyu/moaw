@@ -318,7 +318,7 @@ As the name suggests, the app uses PostgreSQL as the backend database. We'll be 
 
 <div class="task" data-title="Task">
 
-> Start off by forking, then cloning the repo to your local machine. When the repo has been cloned, open it up in VS Code.
+> Start off by forking, then cloning the repo to your local machine. When the repo has been cloned, open it up in VS Code, install the [Dev Container extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers), and click the "Reopen in Container" button. This will take a few minutes to complete.
 
 </div>
 
@@ -331,12 +331,12 @@ As the name suggests, the app uses PostgreSQL as the backend database. We'll be 
 </div>
 
 ```bash
-docker-compose up
+cargo run
 ```
 
 <div class="warning" data-title="Warning">
 
-> This command will take a few minutes to complete. The first time you run it, Docker will need to download the base images and build the app. Subsequent runs will be much faster.
+> This command will take a few minutes to complete and subsequent runs will be much faster.
 
 </div>
 
@@ -359,6 +359,10 @@ There are a few different ways to push an image to ACR. We'll be using the `az a
 </div>
 
 ```bash
+# create a directory where we will be working from
+mkdir pre03
+cd pre03
+
 RG_NAME=<resource-group>
 
 # get the name of the ACR instance
@@ -393,7 +397,7 @@ az acr build \
 
 Earlier, we learned that Kubernetes uses YAML manifests to describe the state of your cluster.
 
-In the previous section, we used `kubectl` to run a pod using both the imperative and declarative approaches. 
+In the previous section, we used `kubectl` to run a pod using both the imperative and declarative approaches.
 
 But, did you know that `kubectl` can also be used to generate YAML manifests for you? Let's take a look at how we can do that to generate a YAML file for our app.
 
@@ -940,7 +944,7 @@ aks-secrets-store-provider-azure-tcc7f   1/1     Running   0          3m35s
 
 </details>
 
-### Creating a ServiceAccount 
+### Creating a ServiceAccount
 
 In order to use the Secret Store CSI driver, we need to create a SecretProviderClass. This is a Kubernetes object that tells the Secret Store CSI driver which secrets to mount and where to mount them. The authentication to the Azure Key Vault will be done using [workload identity](https://learn.microsoft.com/azure/aks/csi-secrets-store-identity-access#access-with-an-azure-ad-workload-identity-preview). This means that the pod will use the managed identity of the AKS cluster to authenticate to the Azure Key Vault.
 
@@ -1170,7 +1174,6 @@ volumeMounts:
     mountPath: "/mnt/secrets-store"
     readOnly: true
 ```
-
 
 <div class="task" data-title="Task">
 
@@ -1446,21 +1449,21 @@ spec:
         app: azure-voting-db
     spec:
       containers:
-      - image: postgres
-        name: postgres
-        resources: {}
-        env:
-        - name: POSTGRES_USER_FILE
-          value: "/mnt/secrets-store/database-user"
-        - name: POSTGRES_PASSWORD_FILE
-          value: "/mnt/secrets-store/database-password"
-        volumeMounts:
-        - name: azure-voting-db-secrets
-          mountPath: "/mnt/secrets-store"
-          readOnly: true
-        - name: azure-voting-db-data
-          mountPath: "/var/lib/postgresql/data"
-          subPath: "data"
+        - image: postgres
+          name: postgres
+          resources: {}
+          env:
+            - name: POSTGRES_USER_FILE
+              value: "/mnt/secrets-store/database-user"
+            - name: POSTGRES_PASSWORD_FILE
+              value: "/mnt/secrets-store/database-password"
+          volumeMounts:
+            - name: azure-voting-db-secrets
+              mountPath: "/mnt/secrets-store"
+              readOnly: true
+            - name: azure-voting-db-data
+              mountPath: "/var/lib/postgresql/data"
+              subPath: "data"
       serviceAccountName: azure-voting-app-serviceaccount
       volumes:
         - name: azure-voting-db-secrets
@@ -1480,11 +1483,15 @@ status: {}
 
 <div class="task" data-title="Task">
 
-> Run the following command to deploy the updated manifest.
+> Run the following command to delete the original db deployment and deploy a new statefulset.
 
 </div>
 
 ```bash
+# delete previous deployment
+kubectl delete deploy azure-voting-db
+
+# deploy new statefulset
 kubectl apply -f azure-voting-db-deployment.yaml
 ```
 
@@ -1712,7 +1719,7 @@ Azure Container Insights provides a lot of useful information, but it doesn't pr
 
 ![Prometheus and Grafana](assets/enable-prometheus-grafana.png)
 
-It will take a few minutes for your cluster to be onboarded. Once it's onboarded, you'll see a link to Grafana. 
+It will take a few minutes for your cluster to be onboarded. Once it's onboarded, you'll see a link to Grafana.
 
 <div class="task" data-title="Task">
 
@@ -1734,7 +1741,7 @@ The Azure Managed Grafana instance is pre-configured with Azure Managed Promethe
 
 ![Kubernetes dashboard](assets/kubernetes-dashboard.png)
 
-You can also browse other dashboards that are available in the [Grafana marketplace](https://grafana.com/grafana/dashboards/). 
+You can also browse other dashboards that are available in the [Grafana marketplace](https://grafana.com/grafana/dashboards/).
 
 <div class="tip" data-title="Tip">
 
@@ -1750,7 +1757,7 @@ These should be enough to get you started. Feel free to explore the other dashbo
 
 As your app becomes more popular, you'll need to scale it to handle the increased load. In AKS, you can scale your app by increasing the number of replicas in your deployment. The Kubernetes Horizontal Pod Autoscaler (HPA) will automatically scale your app based on CPU and/or memory utilization. But not all workloads rely on these metrics for scaling. If say, you need to scale your workload based on the number of items in a queue, HPA will not be sufficient.
 
-This is where we take a different approach and deploy KEDA to scale our app. [KEDA is a Kubernetes-based Event Driven Autoscaler](https://keda.sh/). It allows you to scale your app on basically any metric. If there is a metric that KEDA can can access to, it can scale based on it. Under the covers KEDA, looks at the metrics and your scaling rules and eventually creates a HPA to do the actual scaling. 
+This is where we take a different approach and deploy KEDA to scale our app. [KEDA is a Kubernetes-based Event Driven Autoscaler](https://keda.sh/). It allows you to scale your app on basically any metric. If there is a metric that KEDA can can access to, it can scale based on it. Under the covers KEDA, looks at the metrics and your scaling rules and eventually creates a HPA to do the actual scaling.
 
 The AKS add-on for KEDA has already been installed in your cluster.
 
@@ -1776,7 +1783,7 @@ resources:
 
 <div class="info" data-title="Info">
 
-> Your `azure-voting-db-deployment.yaml` file should now look like this:
+> Your `azure-voting-app-deployment.yaml` file should now look like this:
 
 </div>
 
@@ -1803,27 +1810,27 @@ spec:
         app: azure-voting-db
     spec:
       containers:
-      - image: postgres
-        name: postgres
-        resources:
-          requests:
-            cpu: 4m
-            memory: 55Mi
-          limits:
-            cpu: 6m
-            memory: 75Mi
-        env:
-        - name: POSTGRES_USER_FILE
-          value: "/mnt/secrets-store/database-user"
-        - name: POSTGRES_PASSWORD_FILE
-          value: "/mnt/secrets-store/database-password"
-        volumeMounts:
-        - name: azure-voting-db-secrets
-          mountPath: "/mnt/secrets-store"
-          readOnly: true
-        - name: azure-voting-db-data
-          mountPath: "/var/lib/postgresql/data"
-          subPath: "data"
+        - image: postgres
+          name: postgres
+          resources:
+            requests:
+              cpu: 4m
+              memory: 55Mi
+            limits:
+              cpu: 6m
+              memory: 75Mi
+          env:
+            - name: POSTGRES_USER_FILE
+              value: "/mnt/secrets-store/database-user"
+            - name: POSTGRES_PASSWORD_FILE
+              value: "/mnt/secrets-store/database-password"
+          volumeMounts:
+            - name: azure-voting-db-secrets
+              mountPath: "/mnt/secrets-store"
+              readOnly: true
+            - name: azure-voting-db-data
+              mountPath: "/var/lib/postgresql/data"
+              subPath: "data"
       serviceAccountName: azure-voting-app-serviceaccount
       volumes:
         - name: azure-voting-db-secrets
@@ -1840,7 +1847,6 @@ status: {}
 ```
 
 </details>
-
 
 <div class="task" data-title="Task">
 
@@ -1915,10 +1921,9 @@ Now that our app is enabled for autoscaling, let's generate some load on our app
 
 We'll use the [Azure Load Testing](https://learn.microsoft.com/azure/load-testing/overview-what-is-azure-load-testing) service to generate load on our app and watch KEDA scale our app.
 
-
 <div class="task" data-title="Task">
 
-> In the Azure Portal, navigate to your shared resource group and click on your Azure Load Testing resource. Click the **Quick test** button to create a new test. In the **Quick test** blade, enter your ingress IP as the URL. Set the number of virtual users to **250**, a ramp up time of **60**, and the test duration to **240** seconds. Click the **Run test** button to start the test. 
+> In the Azure Portal, navigate to your shared resource group and click on your Azure Load Testing resource. Click the **Quick test** button to create a new test. In the **Quick test** blade, enter your ingress IP as the URL. Set the number of virtual users to **250**, a ramp up time of **60**, and the test duration to **240** seconds. Click the **Run test** button to start the test.
 
 </div>
 
@@ -1956,7 +1961,7 @@ After a few minutes, you should start to see the number of replicas increase as 
 
 ## Summary
 
-Congratulations on completing this lab! 
+Congratulations on completing this lab!
 
 In this lab, you learned how to:
 
