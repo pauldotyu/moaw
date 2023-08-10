@@ -45,7 +45,7 @@
     "lodash.kebabcase": "^4.1.1",
     "minimist": "^1.2.8",
     "update-notifier": "^6.0.2",
-    "yaml": "^2.2.1"
+    "yaml": "^2.2.2"
   },
   "keywords": [
     "cli",

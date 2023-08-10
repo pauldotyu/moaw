@@ -15,7 +15,7 @@
     "marked": "^4.0.19",
     "node-fetch": "^3.2.10",
     "ts-node": "^10.9.1",
-    "yaml": "^2.1.1"
+    "yaml": "^2.2.2"
   },
   "devDependencies": {
     "@types/marked": "^4.0.7",
