@@ -67,6 +67,18 @@ Application code changes will be required to allow the `ai-service` to use eithe
 
 </div>
 
+With the repo open in a terminal, make sure to checkout a specific commit.
+
+<div class="task" data-title="task">
+
+> Run the following command to checkout a commit.
+
+</div>
+
+```bash
+git checkout e858d8bfd92b142dbb9e8b3b890a5f191e8fc926
+```
+
 ### Overview of Azure Identity SDK
 
 [Azure Identity SDK](https://learn.microsoft.com/python/api/overview/azure/identity-readme?view=azure-python) is a token acquisition library that is built on top of [Microsoft Authentication Library (MSAL)](https://learn.microsoft.com/azure/active-directory/develop/msal-overview). It is integrated with all the Azure SDK client libraries and offers a good abstraction layer to help you obtain security tokens without needing to know all the complexities different credential types (e.g., default, environment, managed identity, interactive, etc.). 
